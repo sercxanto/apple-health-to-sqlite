@@ -1,0 +1,57 @@
+<!-- Assorted records covering the awkward corners of the Record element.
+     Values are chosen to be easy to assert on, not to be realistic. -->
+
+<!-- Plain numeric record with metadata. -->
+<Record type="HKQuantityTypeIdentifierStepCount" unit="count" value="1200"
+        sourceName="Apple Watch" sourceVersion="10.3"
+        device="&lt;&lt;HKDevice: 0x1&gt;, name:Apple Watch, manufacturer:Apple Inc., model:Watch, hardware:Watch6,2, software:10.3&gt;"
+        creationDate="2026-08-01 09:00:10 +0200"
+        startDate="2026-08-01 08:00:00 +0200" endDate="2026-08-01 09:00:00 +0200">
+ <MetadataEntry key="HKWasUserEntered" value="0"/>
+ <MetadataEntry key="HKTimeZone" value="Europe/Berlin"/>
+</Record>
+
+<!-- Same day, so the two sum to 1700 in daily_metrics. -->
+<Record type="HKQuantityTypeIdentifierStepCount" unit="count" value="500"
+        sourceName="iPhone" sourceVersion="17.4"
+        startDate="2026-08-01 10:00:00 +0200" endDate="2026-08-01 11:00:00 +0200"/>
+
+<!-- Category record: the value is a name, not a number. -->
+<Record type="HKCategoryTypeIdentifierSleepAnalysis"
+        value="HKCategoryValueSleepAnalysisAsleepREM"
+        sourceName="Apple Watch" sourceVersion="10.3"
+        startDate="2026-08-01 02:00:00 +0200" endDate="2026-08-01 03:00:00 +0200"/>
+
+<!-- Heart rate variability carries a nested list of individual beats. -->
+<Record type="HKQuantityTypeIdentifierHeartRateVariabilitySDNN" unit="ms" value="41.5"
+        sourceName="Apple Watch" sourceVersion="10.3"
+        startDate="2026-08-01 04:00:00 +0200" endDate="2026-08-01 04:01:00 +0200">
+ <HeartRateVariabilityMetadataList>
+  <InstantaneousBeatsPerMinute bpm="58" time="2026-08-01 04:00:00 +0200"/>
+  <InstantaneousBeatsPerMinute bpm="61" time="2026-08-01 04:00:01 +0200"/>
+  <InstantaneousBeatsPerMinute bpm="57" time="2026-08-01 04:00:02 +0200"/>
+ </HeartRateVariabilityMetadataList>
+</Record>
+
+<!-- Blood pressure: a Correlation wrapping two Records. -->
+<Correlation type="HKCorrelationTypeIdentifierBloodPressure"
+             sourceName="Health" sourceVersion="17.4"
+             startDate="2026-08-01 08:10:00 +0200" endDate="2026-08-01 08:10:00 +0200">
+ <MetadataEntry key="HKWasUserEntered" value="1"/>
+ <Record type="HKQuantityTypeIdentifierBloodPressureSystolic" unit="mmHg" value="124"
+         sourceName="Health" sourceVersion="17.4"
+         startDate="2026-08-01 08:10:00 +0200" endDate="2026-08-01 08:10:00 +0200"/>
+ <Record type="HKQuantityTypeIdentifierBloodPressureDiastolic" unit="mmHg" value="79"
+         sourceName="Health" sourceVersion="17.4"
+         startDate="2026-08-01 08:10:00 +0200" endDate="2026-08-01 08:10:00 +0200"/>
+</Correlation>
+
+<!-- Negative UTC offset: the local date and the UTC instant disagree. -->
+<Record type="HKQuantityTypeIdentifierBodyMass" unit="kg" value="80.5"
+        sourceName="Smart Scale" sourceVersion="6.2.1"
+        startDate="2026-03-05 23:30:00 -0500" endDate="2026-03-05 23:30:00 -0500"/>
+
+<!-- No unit, no value: allowed by the DTD, and it happens. -->
+<Record type="HKCategoryTypeIdentifierMindfulSession"
+        sourceName="iPhone" sourceVersion="17.4"
+        startDate="2026-08-01 21:00:00 +0200" endDate="2026-08-01 21:10:00 +0200"/>

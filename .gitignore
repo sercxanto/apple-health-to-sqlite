@@ -1,0 +1,16 @@
+# Never commit health data — see CONTRIBUTING.md.
+*.db
+*.db-wal
+*.db-shm
+export*.zip
+Export*.zip
+apple_health_export/
+demo/
+
+# Python
+__pycache__/
+*.egg-info/
+build/
+dist/
+.venv/
+.ruff_cache/

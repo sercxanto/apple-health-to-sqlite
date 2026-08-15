@@ -1,0 +1,61 @@
+<!-- The three shapes a Workout comes in. -->
+
+<!-- Version 14 style: the totals live in WorkoutStatistics children, and the
+     Workout element itself carries no totalDistance attribute at all. -->
+<Workout workoutActivityType="HKWorkoutActivityTypeRunning"
+         duration="60" durationUnit="min"
+         sourceName="Apple Watch" sourceVersion="10.3"
+         device="&lt;&lt;HKDevice: 0x1&gt;, name:Apple Watch, manufacturer:Apple Inc., model:Watch, hardware:Watch6,2, software:10.3&gt;"
+         creationDate="2026-08-01 19:00:00 +0200"
+         startDate="2026-08-01 18:00:00 +0200" endDate="2026-08-01 19:00:00 +0200">
+ <MetadataEntry key="HKIndoorWorkout" value="0"/>
+ <WorkoutEvent type="HKWorkoutEventTypePause" date="2026-08-01 18:30:00 +0200"/>
+ <WorkoutEvent type="HKWorkoutEventTypeResume" date="2026-08-01 18:31:00 +0200"/>
+ <WorkoutStatistics type="HKQuantityTypeIdentifierDistanceWalkingRunning"
+                    startDate="2026-08-01 18:00:00 +0200"
+                    endDate="2026-08-01 19:00:00 +0200" sum="10.5" unit="km"/>
+ <WorkoutStatistics type="HKQuantityTypeIdentifierActiveEnergyBurned"
+                    startDate="2026-08-01 18:00:00 +0200"
+                    endDate="2026-08-01 19:00:00 +0200" sum="620.25" unit="kcal"/>
+ <WorkoutStatistics type="HKQuantityTypeIdentifierHeartRate"
+                    startDate="2026-08-01 18:00:00 +0200"
+                    endDate="2026-08-01 19:00:00 +0200"
+                    average="150.5" minimum="98" maximum="178" unit="count/min"/>
+ <WorkoutRoute sourceName="Apple Watch" sourceVersion="10.3"
+               creationDate="2026-08-01 19:00:00 +0200"
+               startDate="2026-08-01 18:00:00 +0200" endDate="2026-08-01 19:00:00 +0200">
+  <FileReference path="/workout-routes/route_a.gpx"/>
+ </WorkoutRoute>
+</Workout>
+
+<!-- Pre-14 style, kept working on purpose: the totals are attributes. An old
+     export merged into an existing database should not lose its distances. -->
+<Workout workoutActivityType="HKWorkoutActivityTypeCycling"
+         duration="30" durationUnit="min"
+         totalDistance="12.25" totalDistanceUnit="km"
+         totalEnergyBurned="310.5" totalEnergyBurnedUnit="kcal"
+         sourceName="Apple Watch" sourceVersion="9.0"
+         startDate="2026-08-02 18:00:00 +0200" endDate="2026-08-02 18:30:00 +0200"/>
+
+<!-- Multi-sport: segments carry their own statistics, which must not collide
+     with the workout-level ones on (workout_id, type). -->
+<Workout workoutActivityType="HKWorkoutActivityTypeSwimBikeRun"
+         duration="90" durationUnit="min"
+         sourceName="Apple Watch" sourceVersion="10.3"
+         startDate="2026-08-03 09:00:00 +0200" endDate="2026-08-03 10:30:00 +0200">
+ <WorkoutStatistics type="HKQuantityTypeIdentifierActiveEnergyBurned"
+                    startDate="2026-08-03 09:00:00 +0200"
+                    endDate="2026-08-03 10:30:00 +0200" sum="900" unit="kcal"/>
+ <WorkoutActivity uuid="segment-swim" startDate="2026-08-03 09:00:00 +0200"
+                  endDate="2026-08-03 09:30:00 +0200" duration="30" durationUnit="min">
+  <WorkoutStatistics type="HKQuantityTypeIdentifierActiveEnergyBurned"
+                     startDate="2026-08-03 09:00:00 +0200"
+                     endDate="2026-08-03 09:30:00 +0200" sum="300" unit="kcal"/>
+ </WorkoutActivity>
+ <WorkoutActivity uuid="segment-bike" startDate="2026-08-03 09:30:00 +0200"
+                  endDate="2026-08-03 10:30:00 +0200" duration="60" durationUnit="min">
+  <WorkoutStatistics type="HKQuantityTypeIdentifierActiveEnergyBurned"
+                     startDate="2026-08-03 09:30:00 +0200"
+                     endDate="2026-08-03 10:30:00 +0200" sum="600" unit="kcal"/>
+ </WorkoutActivity>
+</Workout>

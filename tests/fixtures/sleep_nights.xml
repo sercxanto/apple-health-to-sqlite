@@ -1,0 +1,28 @@
+<!-- Sleep segments either side of the noon boundary that separates one night
+     from the next. Everything from 12:00 onwards belongs to the night named
+     after that day; everything before it to the previous night. -->
+
+<!-- Night of 2026-08-01: falls asleep before midnight. -->
+<Record type="HKCategoryTypeIdentifierSleepAnalysis"
+        value="HKCategoryValueSleepAnalysisInBed"
+        sourceName="Apple Watch" sourceVersion="10.3"
+        startDate="2026-08-01 23:00:00 +0200" endDate="2026-08-02 07:00:00 +0200"/>
+<Record type="HKCategoryTypeIdentifierSleepAnalysis"
+        value="HKCategoryValueSleepAnalysisAsleepCore"
+        sourceName="Apple Watch" sourceVersion="10.3"
+        startDate="2026-08-01 23:30:00 +0200" endDate="2026-08-02 01:30:00 +0200"/>
+<!-- After midnight, still the same night. -->
+<Record type="HKCategoryTypeIdentifierSleepAnalysis"
+        value="HKCategoryValueSleepAnalysisAsleepDeep"
+        sourceName="Apple Watch" sourceVersion="10.3"
+        startDate="2026-08-02 01:30:00 +0200" endDate="2026-08-02 02:30:00 +0200"/>
+<Record type="HKCategoryTypeIdentifierSleepAnalysis"
+        value="HKCategoryValueSleepAnalysisAwake"
+        sourceName="Apple Watch" sourceVersion="10.3"
+        startDate="2026-08-02 03:00:00 +0200" endDate="2026-08-02 03:15:00 +0200"/>
+
+<!-- An afternoon nap on 2026-08-02, after noon: a night of its own. -->
+<Record type="HKCategoryTypeIdentifierSleepAnalysis"
+        value="HKCategoryValueSleepAnalysisAsleepREM"
+        sourceName="Apple Watch" sourceVersion="10.3"
+        startDate="2026-08-02 14:00:00 +0200" endDate="2026-08-02 15:00:00 +0200"/>

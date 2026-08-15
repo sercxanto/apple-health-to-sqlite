@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "apple-health-to-sqlite"
+version = "0.1.0"
+description = "Convert an Apple Health export (HealthKit export version 14+) to SQLite, ready for Datasette"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+keywords = ["apple health", "healthkit", "sqlite", "datasette", "quantified self"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "Programming Language :: Python :: 3",
+    "Topic :: Database",
+]
+
+# No runtime dependencies. The importer is standard library only, on purpose:
+# it has to run on a stock python3 against a multi-gigabyte export without a
+# virtualenv. See CONTRIBUTING.md for when an exception is acceptable.
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "datasette>=0.65,<1",
+    "datasette-cluster-map",
+    "datasette-vega",
+    "ruff>=0.6",
+]
+
+[project.scripts]
+apple-health-to-sqlite = "applehealth.cli:main"
+
+[tool.setuptools]
+packages = ["applehealth", "applehealth.schema"]
+
+# The DTD lives inside the package so that it is importable both from a plain
+# checkout and from an installed wheel (see applehealth/dtd.py).
+[tool.setuptools.package-data]
+"applehealth.schema" = ["*.dtd", "*.md"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4"]
+ignore = [
+    "SIM108",  # ternaries are not always clearer than if/else
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]

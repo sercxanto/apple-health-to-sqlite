@@ -1,0 +1,16 @@
+<!-- Stands in for whatever Apple adds in a future export version. The importer
+     must keep it rather than drop it, and say so at the end of the run. -->
+
+<Record type="HKQuantityTypeIdentifierStepCount" unit="count" value="100"
+        sourceName="iPhone" sourceVersion="17.4"
+        startDate="2026-08-01 08:00:00 +0200" endDate="2026-08-01 09:00:00 +0200"/>
+
+<FutureHealthThing type="HKSomethingNew" value="42"
+                   startDate="2026-08-01 08:00:00 +0200"
+                   endDate="2026-08-01 09:00:00 +0200">
+ <FutureDetail key="a" value="b"/>
+</FutureHealthThing>
+
+<FutureHealthThing type="HKSomethingNew" value="43"
+                   startDate="2026-08-02 08:00:00 +0200"
+                   endDate="2026-08-02 09:00:00 +0200"/>
