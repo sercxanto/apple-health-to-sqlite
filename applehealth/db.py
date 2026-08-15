@@ -124,16 +124,43 @@ CREATE TABLE IF NOT EXISTS audiograms (
 CREATE TABLE IF NOT EXISTS audiogram_points (
     audiogram_id INTEGER, seq INTEGER,
     frequency_value REAL, frequency_unit TEXT,
-    left_ear_value REAL, left_ear_unit TEXT,
-    right_ear_value REAL, right_ear_unit TEXT,
+    left_ear_value REAL, left_ear_unit TEXT, left_ear_masked TEXT,
+    left_ear_clamping_lower REAL, left_ear_clamping_upper REAL,
+    right_ear_value REAL, right_ear_unit TEXT, right_ear_masked TEXT,
+    right_ear_clamping_lower REAL, right_ear_clamping_upper REAL,
     PRIMARY KEY (audiogram_id, seq)
 ) WITHOUT ROWID;
 
+-- One row per eye. Every measurement has its own unit attribute in the
+-- export, and they are kept rather than assumed: dioptres, degrees,
+-- millimetres and prism dioptres all appear here.
 CREATE TABLE IF NOT EXISTS vision_prescriptions (
     id INTEGER PRIMARY KEY,
-    type TEXT, date_issued TEXT, expiration_date TEXT, brand TEXT,
-    eye TEXT, sphere REAL, cylinder REAL, axis REAL, add_power REAL
+    -- Shared by the two rows of one prescription; extra_metadata.owner_id
+    -- refers to this, not to id.
+    prescription_id INTEGER,
+    type TEXT, date_issued TEXT, expiration_date TEXT, brand TEXT, eye TEXT,
+    sphere REAL, sphere_unit TEXT,
+    cylinder REAL, cylinder_unit TEXT,
+    axis REAL, axis_unit TEXT,
+    add_power REAL, add_power_unit TEXT,
+    vertex REAL, vertex_unit TEXT,
+    prism_amount REAL, prism_amount_unit TEXT,
+    prism_angle REAL, prism_angle_unit TEXT,
+    far_pd REAL, far_pd_unit TEXT,
+    near_pd REAL, near_pd_unit TEXT,
+    base_curve REAL, base_curve_unit TEXT,
+    diameter REAL, diameter_unit TEXT
 );
+
+-- MetadataEntry and Attachment children of the rarer top-level elements
+-- (Audiogram, VisionPrescription). They are too infrequent to deserve a table
+-- each, and dropping them would violate the rule that nothing disappears
+-- silently. owner_type names the table the owner id refers to.
+CREATE TABLE IF NOT EXISTS extra_metadata (
+    owner_type TEXT, owner_id INTEGER, key TEXT, value TEXT,
+    PRIMARY KEY (owner_type, owner_id, key)
+) WITHOUT ROWID;
 
 -- Anything this importer has no handler for. Keeping the raw XML beats
 -- dropping it silently: after an iOS update, this table is where a new

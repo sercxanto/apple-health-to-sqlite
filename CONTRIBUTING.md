@@ -90,9 +90,10 @@ Formatting and lint rules are ruff's job, configured in `pyproject.toml`; run
 * **Names spell things out.** `correlation_id`, not `cid`. The exception is
   loop-local scratch in a two-line block.
 * **Comments explain why, not what.** The reader can see that a distance is
-  copied out of `WorkoutStatistics`; what they cannot see is that Apple moved
-  it there in export version 13 and that reading only the attribute is why
-  other tools show blanks. Write that.
+  copied out of `WorkoutStatistics`; what they cannot see is that the schema
+  offers the same number in two places, that exports disagree about which one
+  they fill in, and that reading only the attribute is why other tools show
+  blanks. Write that.
 * **Docstrings on modules and non-obvious functions.** A module docstring
   should say what the module is *for*, not list its functions.
 * **Errors aimed at the person reading them.** Say what was wrong and what to
@@ -131,8 +132,11 @@ at it. Then:
    one. Give it a content-addressed primary key so re-import stays idempotent;
    child tables key on `(parent_id, seq)` or `(parent_id, name)`.
 4. **Generate it.** Teach `applehealth/generate.py` to emit the element —
-   `tests/test_generate.py` asserts the generator covers every declared
-   element, so this is not optional.
+   `tests/test_generate.py` asserts the generator covers every element that can
+   occur, so this is not optional. Generated exports must stay valid against
+   the schema: only declared attributes, only declared nesting. An element that
+   no content model references cannot be generated at all; cover that with a
+   fixture instead, as `WorkoutActivity` does.
 5. **Test it.** A focused fixture in `tests/fixtures/` for the edge cases, and
    assertions on the generated data for the normal path.
 6. **Document it** in the database layout table in README.md.
@@ -149,9 +153,14 @@ python3 -m applehealth schema-diff /path/to/Export.zip
 The output is declaration differences only — element and attribute names — so
 it is safe to paste into an issue. Apply those differences by hand to
 `applehealth/schema/healthkit-export-v14.dtd`, or replace the file wholesale
-with `extract-schema` output if the version has moved on. Then follow the
-recipe above for anything newly declared, and note the change in
-`applehealth/schema/NOTES.md`.
+with `extract-schema` output if the version has moved on. Keep Apple's own
+comments: at least one of them ("Any Records that appear as children of a
+correlation also appear as top-level records") describes behaviour the importer
+depends on, and a test asserts it is still there.
+
+Then follow the recipe above for anything newly declared, and record what you
+learned in `applehealth/schema/NOTES.md` — its Findings section is where the
+non-obvious parts of the format live.
 
 Supported versions are 14 and newer. Adding support for older exports is not a
 goal; see NOTES.md for what would be involved.

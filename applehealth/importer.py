@@ -179,20 +179,39 @@ class Importer:
 
     # -- buffered writes ---------------------------------------------------
 
-    def add(self, table: str, row: tuple) -> None:
-        rows = self.buffers.setdefault(table, [])
+    #: Buffers that need something other than a plain INSERT OR IGNORE. The key
+    #: is a buffer name, not a table name.
+    STATEMENTS = {
+        # Apple's DTD says it outright: "Any Records that appear as children of
+        # a correlation also appear as top-level records in this document." The
+        # two copies are identical apart from the correlation link, so they
+        # share a content id and collapse into one row — but which copy the
+        # database keeps would otherwise depend on which came first in the
+        # file. Upserting the link means the correlation survives either order.
+        "records@correlated": (
+            "INSERT INTO records VALUES ({placeholders}) "
+            "ON CONFLICT(id) DO UPDATE SET correlation_id = excluded.correlation_id"
+        ),
+    }
+
+    def add(self, buffer: str, row: tuple) -> None:
+        rows = self.buffers.setdefault(buffer, [])
         rows.append(row)
         if len(rows) >= db.BATCH_SIZE:
-            self.flush(table)
+            self.flush(buffer)
 
-    def flush(self, table: str | None = None) -> None:
-        for name in [table] if table else list(self.buffers):
+    def flush(self, buffer: str | None = None) -> None:
+        for name in [buffer] if buffer else list(self.buffers):
             rows = self.buffers.get(name)
             if not rows:
                 continue
             placeholders = ",".join("?" * len(rows[0]))
+            table = name.split("@", 1)[0]
+            statement = self.STATEMENTS.get(
+                name, f"INSERT OR IGNORE INTO {table} VALUES ({{placeholders}})"
+            )
             self.connection.executemany(
-                f"INSERT OR IGNORE INTO {name} VALUES ({placeholders})", rows
+                statement.format(placeholders=placeholders), rows
             )
             rows.clear()
 
@@ -240,7 +259,7 @@ class Importer:
             device,
         )
         self.add(
-            "records",
+            "records@correlated" if correlation_id is not None else "records",
             (
                 record_id,
                 type_name,
@@ -398,9 +417,10 @@ class Importer:
         distance_unit = attributes.get("totalDistanceUnit")
         energy = as_number(attributes.get("totalEnergyBurned"))
         energy_unit = attributes.get("totalEnergyBurnedUnit")
-        # From export version 13 or so, Apple dropped those attributes and put
-        # the numbers in WorkoutStatistics children instead. Tools that only
-        # read the attributes show empty distances on modern exports.
+        # Version 14 declares both the totals as attributes and the
+        # WorkoutStatistics children, and exports differ in which they
+        # actually populate. Reading only the attributes is why some tools
+        # show empty distances, so fall back to the statistics.
         for row in statistics:
             _, activity_uuid, stat_type, _, _, _, _, _, _, total, unit = row
             if activity_uuid or total is None or not stat_type:
@@ -445,7 +465,16 @@ class Importer:
     def _handle_workout_activity(
         self, workout_id: int, element, statistics: list[tuple], event_seq: int
     ) -> int:
-        """A segment of a multi-sport workout, with its own statistics."""
+        """A segment of a multi-sport workout.
+
+        Version 14 declares `WorkoutActivity` but no content model references
+        it, so by that schema it cannot legally appear anywhere — Apple's DTD
+        is inconsistent here. The declaration exists for a reason, so this
+        stays tolerant: segments are imported wherever they turn up, including
+        the statistics and events the schema does not (yet) declare as their
+        children. Being permissive on input costs a few lines; dropping data
+        because a schema disagreed with reality costs a lot more.
+        """
         attributes = element.attrib
         uuid = attributes.get("uuid") or ""
         self.add(
@@ -542,42 +571,98 @@ class Importer:
                 timestamps.parse(attributes.get("startDate"))[2],
             ),
         )
-        for seq, point in enumerate(element.iter("SensitivityPoint")):
-            self.add(
-                "audiogram_points",
-                (
-                    audiogram_id,
-                    seq,
-                    as_number(point.get("frequencyValue")),
-                    point.get("frequencyUnit"),
-                    as_number(point.get("leftEarValue")),
-                    point.get("leftEarUnit"),
-                    as_number(point.get("rightEarValue")),
-                    point.get("rightEarUnit"),
-                ),
-            )
+        seq = 0
+        for child in element:
+            if child.tag == "MetadataEntry":
+                self.add_extra_metadata(
+                    "audiograms", audiogram_id, child.get("key"), child.get("value")
+                )
+            elif child.tag == "SensitivityPoint":
+                self.add(
+                    "audiogram_points",
+                    (
+                        audiogram_id,
+                        seq,
+                        as_number(child.get("frequencyValue")),
+                        child.get("frequencyUnit"),
+                        as_number(child.get("leftEarValue")),
+                        child.get("leftEarUnit"),
+                        child.get("leftEarMasked"),
+                        as_number(child.get("leftEarClampingRangeLowerBound")),
+                        as_number(child.get("leftEarClampingRangeUpperBound")),
+                        as_number(child.get("rightEarValue")),
+                        child.get("rightEarUnit"),
+                        child.get("rightEarMasked"),
+                        as_number(child.get("rightEarClampingRangeLowerBound")),
+                        as_number(child.get("rightEarClampingRangeUpperBound")),
+                    ),
+                )
+                seq += 1
+
+    #: Eye measurements, as (export attribute, unit attribute). Every value in
+    #: a prescription carries its own unit, so both are stored.
+    EYE_MEASUREMENTS = (
+        ("sphere", "sphereUnit"),
+        ("cylinder", "cylinderUnit"),
+        ("axis", "axisUnit"),
+        ("add", "addUnit"),
+        ("vertex", "vertexUnit"),
+        ("prismAmount", "prismAmountUnit"),
+        ("prismAngle", "prismAngleUnit"),
+        ("farPD", "farPDUnit"),
+        ("nearPD", "nearPDUnit"),
+        ("baseCurve", "baseCurveUnit"),
+        ("diameter", "diameterUnit"),
+    )
 
     def handle_vision_prescription(self, element) -> None:
         attributes = element.attrib
-        for tag, eye in (("RightEye", "right"), ("LeftEye", "left")):
-            for child in element.iter(tag):
+        prescription_id = db.content_id(
+            attributes.get("type"),
+            attributes.get("dateIssued"),
+            attributes.get("brand"),
+        )
+        attachments = 0
+        for child in element:
+            if child.tag in ("RightEye", "LeftEye"):
+                eye = "right" if child.tag == "RightEye" else "left"
+                measurements: list = []
+                for value_attribute, unit_attribute in self.EYE_MEASUREMENTS:
+                    measurements.append(as_number(child.get(value_attribute)))
+                    measurements.append(child.get(unit_attribute))
                 self.add(
                     "vision_prescriptions",
                     (
-                        db.content_id(
-                            attributes.get("type"), attributes.get("dateIssued"), eye
-                        ),
+                        db.content_id(prescription_id, eye),
+                        prescription_id,
                         attributes.get("type"),
                         attributes.get("dateIssued"),
                         attributes.get("expirationDate"),
                         attributes.get("brand"),
                         eye,
-                        as_number(child.get("sphere")),
-                        as_number(child.get("cylinder")),
-                        as_number(child.get("axis")),
-                        as_number(child.get("add")),
+                        *measurements,
                     ),
                 )
+            elif child.tag == "MetadataEntry":
+                self.add_extra_metadata(
+                    "vision_prescriptions",
+                    prescription_id,
+                    child.get("key"),
+                    child.get("value"),
+                )
+            elif child.tag == "Attachment":
+                self.add_extra_metadata(
+                    "vision_prescriptions",
+                    prescription_id,
+                    f"attachment:{attachments}",
+                    child.get("identifier"),
+                )
+                attachments += 1
+
+    def add_extra_metadata(
+        self, owner_type: str, owner_id: int, key: str | None, value: str | None
+    ) -> None:
+        self.add("extra_metadata", (owner_type, owner_id, key, value))
 
     def handle_unknown(self, element) -> None:
         tag = element.tag

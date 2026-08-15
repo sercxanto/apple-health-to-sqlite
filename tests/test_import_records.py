@@ -82,6 +82,30 @@ class RecordImportTest(unittest.TestCase):
             [("BloodPressureDiastolic", 79.0), ("BloodPressureSystolic", 124.0)],
         )
 
+    def test_records_duplicated_at_top_level_collapse(self):
+        """Apple emits correlation children twice, once nested and once at the
+        top level. Two rows for one measurement would double every blood
+        pressure reading."""
+        self.assertEqual(
+            support.one(
+                self.database,
+                "select count(*) from records "
+                "where type_short = 'BloodPressureSystolic'",
+            ),
+            1,
+        )
+
+    def test_the_duplicate_does_not_erase_the_correlation_link(self):
+        """The copies are identical apart from the link, so whichever row won
+        would otherwise depend on document order."""
+        self.assertIsNotNone(
+            support.one(
+                self.database,
+                "select correlation_id from records "
+                "where type_short = 'BloodPressureSystolic'",
+            )
+        )
+
     def test_records_outside_a_correlation_have_no_correlation_id(self):
         self.assertEqual(
             support.one(

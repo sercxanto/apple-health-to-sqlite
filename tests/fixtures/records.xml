@@ -46,6 +46,19 @@
          startDate="2026-08-01 08:10:00 +0200" endDate="2026-08-01 08:10:00 +0200"/>
 </Correlation>
 
+<!-- The DTD states it plainly: "Any Records that appear as children of a
+     correlation also appear as top-level records in this document." These two
+     are byte-for-byte the copies from the Correlation above. They must collapse
+     into the same rows and must not cost the correlation its link — note that
+     they come *after* the Correlation here and *before* it in the export the
+     generator writes, so both orderings are covered. -->
+<Record type="HKQuantityTypeIdentifierBloodPressureSystolic" unit="mmHg" value="124"
+        sourceName="Health" sourceVersion="17.4"
+        startDate="2026-08-01 08:10:00 +0200" endDate="2026-08-01 08:10:00 +0200"/>
+<Record type="HKQuantityTypeIdentifierBloodPressureDiastolic" unit="mmHg" value="79"
+        sourceName="Health" sourceVersion="17.4"
+        startDate="2026-08-01 08:10:00 +0200" endDate="2026-08-01 08:10:00 +0200"/>
+
 <!-- Negative UTC offset: the local date and the UTC instant disagree. -->
 <Record type="HKQuantityTypeIdentifierBodyMass" unit="kg" value="80.5"
         sourceName="Smart Scale" sourceVersion="6.2.1"

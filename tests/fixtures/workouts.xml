@@ -1,7 +1,8 @@
 <!-- The three shapes a Workout comes in. -->
 
-<!-- Version 14 style: the totals live in WorkoutStatistics children, and the
-     Workout element itself carries no totalDistance attribute at all. -->
+<!-- Statistics only: the schema allows totalDistance and totalEnergyBurned as
+     attributes, but this export leaves them out and puts the numbers in
+     WorkoutStatistics children. Reading only the attributes yields nothing. -->
 <Workout workoutActivityType="HKWorkoutActivityTypeRunning"
          duration="60" durationUnit="min"
          sourceName="Apple Watch" sourceVersion="10.3"
@@ -28,8 +29,8 @@
  </WorkoutRoute>
 </Workout>
 
-<!-- Pre-14 style, kept working on purpose: the totals are attributes. An old
-     export merged into an existing database should not lose its distances. -->
+<!-- Attributes populated instead. Both forms are declared in version 14 and
+     both occur in the wild, so both have to work. -->
 <Workout workoutActivityType="HKWorkoutActivityTypeCycling"
          duration="30" durationUnit="min"
          totalDistance="12.25" totalDistanceUnit="km"
@@ -37,8 +38,12 @@
          sourceName="Apple Watch" sourceVersion="9.0"
          startDate="2026-08-02 18:00:00 +0200" endDate="2026-08-02 18:30:00 +0200"/>
 
-<!-- Multi-sport: segments carry their own statistics, which must not collide
-     with the workout-level ones on (workout_id, type). -->
+<!-- Multi-sport. Deliberately beyond what the version 14 DTD declares: it
+     defines WorkoutActivity but no content model references it, and it does not
+     list WorkoutStatistics among its children. The declaration exists for a
+     reason, so the importer stays tolerant here rather than dropping segments
+     because Apple's schema contradicts itself. The segment statistics must also
+     not collide with the workout-level ones on (workout_id, type). -->
 <Workout workoutActivityType="HKWorkoutActivityTypeSwimBikeRun"
          duration="90" durationUnit="min"
          sourceName="Apple Watch" sourceVersion="10.3"

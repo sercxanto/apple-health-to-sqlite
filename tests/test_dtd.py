@@ -50,12 +50,60 @@ class BundledSchemaTest(unittest.TestCase):
             "declared in the DTD but no importer handler",
         )
 
+    def test_workout_activity_is_declared_but_unreachable(self):
+        """Apple's version 14 DTD declares WorkoutActivity and then references
+        it from no content model. Pinned down here so that a future schema
+        update that fixes it is noticed rather than absorbed."""
+        self.assertEqual(
+            set(self.schema.elements) - self.schema.reachable_elements(),
+            {"WorkoutActivity"},
+        )
+
+    def test_correlation_children_are_documented_as_duplicated(self):
+        """The comment drives real behaviour in the importer, so losing it in a
+        schema refresh should be visible."""
+        self.assertIn(
+            "also appear as top-level records",
+            self.schema.text,
+        )
+
+    def test_workout_declares_both_totals_and_statistics(self):
+        """Both forms are declared, which is why the importer reads both."""
+        self.assertIn("totalDistance", self.schema.attributes_of("Workout"))
+        self.assertIn("WorkoutStatistics", self.schema.elements["Workout"].children())
+
     def test_no_handler_without_a_declaration(self):
         self.assertEqual(
             importer.HANDLED_ELEMENTS - set(self.schema.elements),
             set(),
             "handled by the importer but not declared in the DTD",
         )
+
+
+class ReachabilityTest(unittest.TestCase):
+    def test_follows_the_content_models(self):
+        schema = dtd.parse(
+            "<!DOCTYPE HealthData [\n"
+            "<!ELEMENT HealthData (Alpha)>\n"
+            "<!ELEMENT Alpha (Beta*)>\n"
+            "<!ELEMENT Beta EMPTY>\n"
+            "<!ELEMENT Orphan EMPTY>\n"
+            "]>"
+        )
+        self.assertEqual(schema.reachable_elements(), {"HealthData", "Alpha", "Beta"})
+
+    def test_keywords_are_not_mistaken_for_elements(self):
+        schema = dtd.parse("<!DOCTYPE HealthData [\n<!ELEMENT HealthData EMPTY>\n]>")
+        self.assertEqual(schema.reachable_elements(), {"HealthData"})
+
+    def test_survives_a_recursive_content_model(self):
+        schema = dtd.parse(
+            "<!DOCTYPE HealthData [\n"
+            "<!ELEMENT HealthData (Node*)>\n"
+            "<!ELEMENT Node (Node*)>\n"
+            "]>"
+        )
+        self.assertEqual(schema.reachable_elements(), {"HealthData", "Node"})
 
 
 class VersionGateTest(unittest.TestCase):

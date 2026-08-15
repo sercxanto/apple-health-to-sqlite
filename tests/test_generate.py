@@ -11,24 +11,28 @@ from applehealth import dtd, generate
 from . import support
 
 
-def elements_and_attributes(export_path):
-    """Every element name and attribute name appearing in a generated export."""
+def inspect(export_path):
+    """Element names, attribute names and nesting used in a generated export."""
     tags: set[str] = set()
     attributes: dict[str, set[str]] = {}
+    children: dict[str, set[str]] = {}
     with zipfile.ZipFile(export_path) as archive:
         member = next(n for n in archive.namelist() if n.endswith("Export.xml"))
         with archive.open(member) as stream:
             for _event, element in ElementTree.iterparse(stream, events=("end",)):
                 tags.add(element.tag)
                 attributes.setdefault(element.tag, set()).update(element.attrib)
-    return tags, attributes
+                children.setdefault(element.tag, set()).update(
+                    child.tag for child in element
+                )
+    return tags, attributes, children
 
 
 class StructureTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.export = support.sample_export(days=8)
-        cls.tags, cls.attributes = elements_and_attributes(cls.export)
+        cls.tags, cls.attributes, cls.children = inspect(cls.export)
         cls.schema = dtd.bundled()
 
     def test_export_is_well_formed_xml(self):
@@ -47,10 +51,27 @@ class StructureTest(unittest.TestCase):
                 used - declared, set(), f"undeclared attributes on <{tag}>"
             )
 
-    def test_covers_every_declared_element(self):
+    def test_respects_the_declared_content_models(self):
+        """Generated exports have to be valid documents, not merely parseable."""
+        for tag, nested in self.children.items():
+            self.assertEqual(
+                nested - self.schema.elements[tag].children(),
+                set(),
+                f"undeclared children of <{tag}>",
+            )
+
+    def test_covers_every_element_that_can_occur(self):
         """Otherwise a handler could rot without any test noticing."""
-        missing = set(self.schema.elements) - self.tags
-        self.assertEqual(missing, set(), "declared but never generated")
+        missing = self.schema.reachable_elements() - self.tags
+        self.assertEqual(
+            missing, set(), "can occur in an export but is never generated"
+        )
+
+    def test_does_not_emit_the_unreachable_element(self):
+        """`WorkoutActivity` is declared but referenced by no content model, so
+        emitting it would produce an invalid document. The importer still
+        handles it — see tests/fixtures/workouts.xml."""
+        self.assertEqual(set(self.schema.elements) - self.tags, {"WorkoutActivity"})
 
     def test_names_the_export_with_a_capital_e_by_default(self):
         with zipfile.ZipFile(self.export) as archive:

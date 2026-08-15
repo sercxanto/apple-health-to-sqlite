@@ -5,9 +5,12 @@ health data to work on this project. It produces an `export.zip` with the same
 structure the Health app writes — the bundled DTD verbatim, records, workouts
 with GPX routes, activity summaries — at any size you like.
 
-It writes *every* element the schema declares, so the test suite exercises
-every importer handler, and it copies the DTD from `applehealth/schema/` rather
-than embedding its own, so generator and importer cannot drift apart.
+It copies the DTD from `applehealth/schema/` rather than embedding its own, and
+writes every element that schema allows to occur — so the test suite exercises
+every importer handler and generator and importer cannot drift apart. The one
+exception is `WorkoutActivity`, which version 14 declares but references from
+no content model: emitting it would produce an invalid document, so a fixture
+covers it instead.
 """
 
 from __future__ import annotations
@@ -341,11 +344,16 @@ class Generator:
             )
 
     def blood_pressure(self, day: date, index: int):
-        """Blood pressure arrives as a Correlation wrapping two Records."""
+        """Blood pressure arrives as a Correlation wrapping two Records.
+
+        The DTD notes that those child records *also* appear as top-level
+        records in the same document, so they are emitted twice here. The
+        importer collapses the copies and keeps the correlation link.
+        """
         if index % 4:
             return
         moment = self.at(day, 8.1)
-        inner = self.record(
+        systolic = self.record(
             "HKQuantityTypeIdentifierBloodPressureSystolic",
             moment,
             moment,
@@ -354,7 +362,7 @@ class Generator:
             source=MANUAL,
             indent=2,
         )
-        inner += self.record(
+        diastolic = self.record(
             "HKQuantityTypeIdentifierBloodPressureDiastolic",
             moment,
             moment,
@@ -366,7 +374,7 @@ class Generator:
         name, version, _ = MANUAL
         yield wrapped_tag(
             "Correlation",
-            inner,
+            systolic + diastolic,
             type="HKCorrelationTypeIdentifierBloodPressure",
             sourceName=name,
             sourceVersion=version,
@@ -374,6 +382,8 @@ class Generator:
             startDate=format_timestamp(moment),
             endDate=format_timestamp(moment),
         )
+        yield systolic
+        yield diastolic
 
     def miscellaneous(self, day: date):
         yield self.record(
@@ -484,28 +494,6 @@ class Generator:
             unit="count/min",
         )
 
-        if index % 4 == 0:
-            half = timedelta(minutes=minutes / 2)
-            segment = empty_tag(
-                "WorkoutStatistics",
-                indent=3,
-                type=distance_type,
-                startDate=format_timestamp(start),
-                endDate=format_timestamp(start + half),
-                sum=round(distance / 2, 3),
-                unit="km",
-            )
-            inner += wrapped_tag(
-                "WorkoutActivity",
-                segment,
-                indent=2,
-                uuid=f"{day.isoformat()}-segment-1",
-                startDate=format_timestamp(start),
-                endDate=format_timestamp(start + half),
-                duration=round(minutes / 2, 4),
-                durationUnit="min",
-            )
-
         route_name = "route_{}_{}.gpx".format(
             day.isoformat(), start.strftime("%I.%M%p").lstrip("0").lower()
         )
@@ -536,12 +524,26 @@ class Generator:
                 metadata={"HKMetadataKeyHeartRateMotionContext": "2"},
             )
 
+        # The totals are declared as attributes *and* available as statistics.
+        # Real exports vary in which they populate, so do the same: every
+        # fourth workout carries the statistics only, which is what exercises
+        # the importer's fallback.
+        totals: dict[str, object] = {}
+        if index % 4:
+            totals = {
+                "totalDistance": distance,
+                "totalDistanceUnit": "km",
+                "totalEnergyBurned": energy,
+                "totalEnergyBurnedUnit": "kcal",
+            }
+
         yield wrapped_tag(
             "Workout",
             inner,
             workoutActivityType=activity,
             duration=round(minutes, 4),
             durationUnit="min",
+            **totals,
             sourceName=name,
             sourceVersion=version,
             device=device,
@@ -604,7 +606,9 @@ class Generator:
     def occasional_elements(self, day: date) -> str:
         """One of each rarer element, so every handler sees data."""
         moment = self.at(day, 11)
-        points = ""
+        points = empty_tag(
+            "MetadataEntry", indent=2, key="HKMetadataKeyAudiogramTestMethod", value="1"
+        )
         for frequency in (500, 1000, 2000, 4000, 8000):
             points += empty_tag(
                 "SensitivityPoint",
@@ -613,8 +617,14 @@ class Generator:
                 frequencyUnit="Hz",
                 leftEarValue=round(self.around(12, 8), 1),
                 leftEarUnit="dBHL",
+                leftEarMasked="0",
+                leftEarClampingRangeLowerBound=0,
+                leftEarClampingRangeUpperBound=90,
                 rightEarValue=round(self.around(12, 8), 1),
                 rightEarUnit="dBHL",
+                rightEarMasked="0",
+                rightEarClampingRangeLowerBound=0,
+                rightEarClampingRangeUpperBound=90,
             )
         output = wrapped_tag(
             "Audiogram",
@@ -636,27 +646,36 @@ class Generator:
             receivedDate=format_timestamp(moment),
             resourceFilePath="/clinical-records/LabResult-0f3f0a1c.json",
         )
-        eyes = empty_tag(
-            "RightEye",
-            indent=2,
-            sphere="-1.25",
-            cylinder="-0.5",
-            axis="180",
-            add="0",
-            vertex="12",
-            farPupillaryDistance="32",
-        )
-        eyes += empty_tag(
-            "LeftEye",
-            indent=2,
-            sphere="-1.5",
-            cylinder="-0.25",
-            axis="175",
-            add="0",
-            vertex="12",
-            farPupillaryDistance="32",
-        )
+        eyes = ""
+        for tag, sphere, cylinder, axis in (
+            ("RightEye", "-1.25", "-0.5", "180"),
+            ("LeftEye", "-1.5", "-0.25", "175"),
+        ):
+            eyes += empty_tag(
+                tag,
+                indent=2,
+                sphere=sphere,
+                sphereUnit="diopters",
+                cylinder=cylinder,
+                cylinderUnit="diopters",
+                axis=axis,
+                axisUnit="degrees",
+                add="0",
+                addUnit="diopters",
+                vertex="12",
+                vertexUnit="mm",
+                farPD="32",
+                farPDUnit="mm",
+                nearPD="30",
+                nearPDUnit="mm",
+            )
         eyes += empty_tag("Attachment", indent=2, identifier="prescription-scan-1")
+        eyes += empty_tag(
+            "MetadataEntry",
+            indent=2,
+            key="HKMetadataKeyDeviceSerialNumber",
+            value="n/a",
+        )
         output += wrapped_tag(
             "VisionPrescription",
             eyes,
@@ -714,6 +733,7 @@ class Generator:
                         HKCharacteristicTypeIdentifierBiologicalSex="HKBiologicalSexNotSet",
                         HKCharacteristicTypeIdentifierBloodType="HKBloodTypeNotSet",
                         HKCharacteristicTypeIdentifierFitzpatrickSkinType="HKFitzpatrickSkinTypeNotSet",
+                        HKCharacteristicTypeIdentifierCardioFitnessMedicationsUse="None",
                     )
                 )
                 for index in range(options.days):

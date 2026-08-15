@@ -28,6 +28,10 @@ BUNDLED_DTD = "healthkit-export-v14.dtd"
 #: a multi-gigabyte export into memory.
 _DTD_SEARCH_LIMIT = 512 * 1024
 
+#: Keywords that appear inside a content model but are not element names.
+_CONTENT_KEYWORDS = frozenset({"EMPTY", "ANY", "PCDATA"})
+
+_NAME_RE = re.compile(r"[A-Za-z_][\w.-]*")
 _ELEMENT_RE = re.compile(r"<!ELEMENT\s+(\S+)\s+([^>]*)>", re.DOTALL)
 _ATTLIST_RE = re.compile(r"<!ATTLIST\s+(\S+)\s+([^>]*)>", re.DOTALL)
 _VERSION_RE = re.compile(r"HealthKit Export Version:\s*(\d+)")
@@ -47,6 +51,14 @@ class Element:
     content: str
     attributes: dict[str, str] = field(default_factory=dict)
 
+    def children(self) -> set[str]:
+        """Element names appearing in this element's content model."""
+        return {
+            name
+            for name in _NAME_RE.findall(self.content)
+            if name not in _CONTENT_KEYWORDS
+        }
+
 
 @dataclass
 class Schema:
@@ -62,6 +74,24 @@ class Schema:
     def attributes_of(self, name: str) -> set[str]:
         element = self.elements.get(name)
         return set(element.attributes) if element else set()
+
+    def reachable_elements(self, root: str = "HealthData") -> set[str]:
+        """Elements that can actually occur in a document, from `root` down.
+
+        Apple's DTD declares at least one element that no content model
+        references — `WorkoutActivity` in version 14 — so "declared" and "can
+        appear" are not the same set. The generator can only produce the
+        reachable ones without emitting invalid XML.
+        """
+        seen: set[str] = set()
+        pending = [root]
+        while pending:
+            name = pending.pop()
+            if name in seen or name not in self.elements:
+                continue
+            seen.add(name)
+            pending.extend(self.elements[name].children())
+        return seen
 
     def require_supported(self) -> int:
         """Check the version gate, returning the version on success."""
