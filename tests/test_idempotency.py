@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import unittest
 
-from applehealth import generate
+from applehealth import synthetic
 
 from . import support
 
@@ -47,13 +47,13 @@ class ReimportTest(unittest.TestCase):
     def test_overlapping_export_adds_only_the_new_days(self):
         base = support.workspace("incremental")
         options = {"seed": 11, "scale": 1.0}
-        generate.generate(
+        synthetic.synthesize(
             base / "first.zip",
-            generate.GenerateOptions(days=10, end_date="2026-08-10", **options),
+            synthetic.SynthesizeOptions(days=10, end_date="2026-08-10", **options),
         )
-        generate.generate(
+        synthetic.synthesize(
             base / "second.zip",
-            generate.GenerateOptions(days=10, end_date="2026-08-15", **options),
+            synthetic.SynthesizeOptions(days=10, end_date="2026-08-15", **options),
         )
 
         database, _ = support.import_export(base / "first.zip")

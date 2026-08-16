@@ -1,6 +1,6 @@
 """Slow test: the two properties that only show up at size.
 
-Opt in with `APPLEHEALTH_SLOW_TESTS=1` (or `make test-all`). It generates a few
+Opt in with `APPLEHEALTH_SLOW_TESTS=1` (or `make test-all`). It synthesizes a few
 hundred thousand records, which takes a minute or two.
 
 What it guards:
@@ -19,7 +19,7 @@ import shutil
 import sys
 import unittest
 
-from applehealth import generate
+from applehealth import synthetic
 
 from . import support
 
@@ -46,9 +46,9 @@ class LargeExportTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.export = support.workspace("large") / "Export.zip"
-        generate.generate(
+        synthetic.synthesize(
             cls.export,
-            generate.GenerateOptions(days=365, scale=2.0, end_date="2026-08-14"),
+            synthetic.SynthesizeOptions(days=365, scale=2.0, end_date="2026-08-14"),
         )
         cls.database, cls.result = support.import_export(cls.export)
 

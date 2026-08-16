@@ -11,7 +11,7 @@ reference.
 ## Ground rules
 
 1. **No real health data in this repository. Ever.** Not as a fixture, not
-   "temporarily", not in a branch. Everything the tests need is generated —
+   "temporarily", not in a branch. Everything the tests need is synthesized —
    see [Test data](#test-data).
 2. **English**, in code, comments, docs, commit messages and CLI output.
 3. **Standard library first.** See [Dependencies](#dependencies).
@@ -45,7 +45,7 @@ If you prefer not to have a virtualenv, `pipx install datasette` and
 | `make lint` | `ruff check` and `ruff format --check` |
 | `make format` | apply formatting and safe fixes |
 | `make check` | lint + fast tests — what CI runs |
-| `make demo` | generate a synthetic export, import it, serve it |
+| `make demo` | synthesize an export, import it, serve it |
 | `make serve` | serve an already-built demo database |
 | `make clean` | remove build artefacts and `demo/` |
 
@@ -57,7 +57,7 @@ python3 -m unittest tests.test_derive.SleepViewTest.test_a_night_spans_midnight
 ```
 
 The slow test (`tests/test_large_export.py`) is skipped unless
-`APPLEHEALTH_SLOW_TESTS=1` is set. It generates a few hundred thousand records
+`APPLEHEALTH_SLOW_TESTS=1` is set. It synthesizes a few hundred thousand records
 and takes a minute or two; CI runs it once per push, not per Python version.
 
 ## Layout
@@ -74,7 +74,7 @@ applehealth/
     timestamps.py   Apple's timestamp format
     db.py           DDL, indexes, content-addressed row ids
     derive.py       daily_metrics and the views
-    generate.py     synthetic exports
+    synthetic.py    synthetic exports
 datasette/metadata.yml   facets and canned queries
 tests/                   unittest suite; tests/fixtures/*.xml are hand-written
 ```
@@ -131,14 +131,14 @@ at it. Then:
 3. **Add a table** in `applehealth/db.py` if the data does not fit an existing
    one. Give it a content-addressed primary key so re-import stays idempotent;
    child tables key on `(parent_id, seq)` or `(parent_id, name)`.
-4. **Generate it.** Teach `applehealth/generate.py` to emit the element —
-   `tests/test_generate.py` asserts the generator covers every element that can
-   occur, so this is not optional. Generated exports must stay valid against
-   the schema: only declared attributes, only declared nesting. An element that
-   no content model references cannot be generated at all; cover that with a
-   fixture instead, as `WorkoutActivity` does.
+4. **Synthesize it.** Teach `applehealth/synthetic.py` to emit the element —
+   `tests/test_synthetic.py` asserts the synthesizer covers every element that
+   can occur, so this is not optional. Synthetic exports must stay valid
+   against the schema: only declared attributes, only declared nesting. An
+   element that no content model references cannot be synthesized at all;
+   cover that with a fixture instead, as `WorkoutActivity` does.
 5. **Test it.** A focused fixture in `tests/fixtures/` for the edge cases, and
-   assertions on the generated data for the normal path.
+   assertions on the synthetic data for the normal path.
 6. **Document it** in the database layout table in README.md.
 
 ### Refreshing the bundled schema
@@ -169,7 +169,7 @@ goal; see NOTES.md for what would be involved.
 
 Two sources, both synthetic:
 
-* `applehealth/generate.py` for realistic, multi-day data. `support.sample_database()`
+* `applehealth/synthetic.py` for realistic, multi-day data. `support.sample_database()`
   caches one per test run.
 * `tests/fixtures/*.xml` for edge cases, where reading the exact input matters
   more than realism. Fixtures contain only the `<HealthData>` body;

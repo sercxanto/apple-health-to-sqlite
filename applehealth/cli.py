@@ -10,7 +10,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import __version__, dtd, generate, pipeline, schema_tools
+from . import __version__, dtd, pipeline, schema_tools, synthetic
 from .archive import ExportNotFound
 from .importer import ImportOptions
 
@@ -57,26 +57,26 @@ def build_parser() -> argparse.ArgumentParser:
     )
     importer.add_argument("--quiet", action="store_true", help="no progress output")
 
-    generator = commands.add_parser(
-        "generate", help="write a synthetic export for testing"
+    synthesizer = commands.add_parser(
+        "synthesize", help="write a synthetic export for testing"
     )
-    generator.add_argument("output", nargs="?", default="export.zip")
-    generator.add_argument("--days", type=int, default=30)
-    generator.add_argument(
+    synthesizer.add_argument("output", nargs="?", default="export.zip")
+    synthesizer.add_argument("--days", type=int, default=30)
+    synthesizer.add_argument(
         "--end-date", metavar="YYYY-MM-DD", help="last day (default: today)"
     )
-    generator.add_argument(
+    synthesizer.add_argument(
         "--scale",
         type=float,
         default=1.0,
         help="sampling density multiplier; 4 means four times as many samples",
     )
-    generator.add_argument("--seed", type=int, default=42)
-    generator.add_argument(
+    synthesizer.add_argument("--seed", type=int, default=42)
+    synthesizer.add_argument(
         "--utc-offset", type=int, default=2, help="timezone offset of the timestamps"
     )
-    generator.add_argument("--locale", default="en_US")
-    generator.add_argument("--quiet", action="store_true")
+    synthesizer.add_argument("--locale", default="en_US")
+    synthesizer.add_argument("--quiet", action="store_true")
 
     extract = commands.add_parser(
         "extract-schema", help="print the DTD embedded in an export"
@@ -140,8 +140,8 @@ def _report(args: argparse.Namespace, result) -> None:
         )
 
 
-def command_generate(args: argparse.Namespace) -> int:
-    options = generate.GenerateOptions(
+def command_synthesize(args: argparse.Namespace) -> int:
+    options = synthetic.SynthesizeOptions(
         days=args.days,
         end_date=args.end_date,
         scale=args.scale,
@@ -153,7 +153,7 @@ def command_generate(args: argparse.Namespace) -> int:
     def on_progress(done: int, total: int) -> None:
         print(f"  {done}/{total} days", file=sys.stderr)
 
-    result = generate.generate(
+    result = synthetic.synthesize(
         args.output, options, on_progress=None if args.quiet else on_progress
     )
     if not args.quiet:
@@ -199,7 +199,7 @@ def command_schema_diff(args: argparse.Namespace) -> int:
 
 COMMANDS = {
     "import": command_import,
-    "generate": command_generate,
+    "synthesize": command_synthesize,
     "extract-schema": command_extract_schema,
     "schema-diff": command_schema_diff,
 }

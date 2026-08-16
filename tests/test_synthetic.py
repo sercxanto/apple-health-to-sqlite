@@ -1,4 +1,4 @@
-"""The generator stands in for real health data, so it has to be faithful."""
+"""The synthesizer stands in for real health data, so it has to be faithful."""
 
 from __future__ import annotations
 
@@ -6,13 +6,13 @@ import unittest
 import xml.etree.ElementTree as ElementTree
 import zipfile
 
-from applehealth import dtd, generate
+from applehealth import dtd, synthetic
 
 from . import support
 
 
 def inspect(export_path):
-    """Element names, attribute names and nesting used in a generated export."""
+    """Element names, attribute names and nesting used in a synthetic export."""
     tags: set[str] = set()
     attributes: dict[str, set[str]] = {}
     children: dict[str, set[str]] = {}
@@ -52,7 +52,7 @@ class StructureTest(unittest.TestCase):
             )
 
     def test_respects_the_declared_content_models(self):
-        """Generated exports have to be valid documents, not merely parseable."""
+        """Synthetic exports have to be valid documents, not merely parseable."""
         for tag, nested in self.children.items():
             self.assertEqual(
                 nested - self.schema.elements[tag].children(),
@@ -64,7 +64,7 @@ class StructureTest(unittest.TestCase):
         """Otherwise a handler could rot without any test noticing."""
         missing = self.schema.reachable_elements() - self.tags
         self.assertEqual(
-            missing, set(), "can occur in an export but is never generated"
+            missing, set(), "can occur in an export but is never synthesized"
         )
 
     def test_does_not_emit_the_unreachable_element(self):
@@ -89,11 +89,11 @@ class StructureTest(unittest.TestCase):
 
 class DeterminismTest(unittest.TestCase):
     def test_same_seed_produces_the_same_export(self):
-        options = generate.GenerateOptions(days=3, seed=99, end_date="2026-08-14")
+        options = synthetic.SynthesizeOptions(days=3, seed=99, end_date="2026-08-14")
         first = support.workspace("gen") / "a.zip"
         second = support.workspace("gen") / "b.zip"
-        generate.generate(first, options)
-        generate.generate(second, options)
+        synthetic.synthesize(first, options)
+        synthetic.synthesize(second, options)
         self.assertEqual(
             zipfile.ZipFile(first).read("apple_health_export/Export.xml"),
             zipfile.ZipFile(second).read("apple_health_export/Export.xml"),
@@ -101,13 +101,13 @@ class DeterminismTest(unittest.TestCase):
 
     def test_different_seeds_produce_different_data(self):
         base = support.workspace("gen")
-        generate.generate(
+        synthetic.synthesize(
             base / "a.zip",
-            generate.GenerateOptions(days=3, seed=1, end_date="2026-08-14"),
+            synthetic.SynthesizeOptions(days=3, seed=1, end_date="2026-08-14"),
         )
-        generate.generate(
+        synthetic.synthesize(
             base / "b.zip",
-            generate.GenerateOptions(days=3, seed=2, end_date="2026-08-14"),
+            synthetic.SynthesizeOptions(days=3, seed=2, end_date="2026-08-14"),
         )
         self.assertNotEqual(
             zipfile.ZipFile(base / "a.zip").read("apple_health_export/Export.xml"),
@@ -115,9 +115,9 @@ class DeterminismTest(unittest.TestCase):
         )
 
     def test_day_count_is_respected(self):
-        result = generate.generate(
+        result = synthetic.synthesize(
             support.workspace("gen") / "c.zip",
-            generate.GenerateOptions(days=5, end_date="2026-08-14"),
+            synthetic.SynthesizeOptions(days=5, end_date="2026-08-14"),
         )
         self.assertEqual(str(result.start_day), "2026-08-10")
         self.assertEqual(str(result.end_day), "2026-08-14")

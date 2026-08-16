@@ -133,8 +133,8 @@ class RouteWithoutWorkoutTest(unittest.TestCase):
         )
 
 
-class GeneratedWorkoutTest(unittest.TestCase):
-    """The same paths, exercised against realistic generated data."""
+class SyntheticWorkoutTest(unittest.TestCase):
+    """The same paths, exercised against realistic synthetic data."""
 
     @classmethod
     def setUpClass(cls):

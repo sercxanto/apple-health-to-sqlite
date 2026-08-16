@@ -1,4 +1,4 @@
-"""Generate a synthetic Apple Health export.
+"""Synthesize an Apple Health export: same structure, invented data.
 
 The point of this module is that nobody should have to hand over their real
 health data to work on this project. It produces an `export.zip` with the same
@@ -7,10 +7,10 @@ with GPX routes, activity summaries — at any size you like.
 
 It copies the DTD from `applehealth/schema/` rather than embedding its own, and
 writes every element that schema allows to occur — so the test suite exercises
-every importer handler and generator and importer cannot drift apart. The one
-exception is `WorkoutActivity`, which version 14 declares but references from
-no content model: emitting it would produce an invalid document, so a fixture
-covers it instead.
+every importer handler, and this module and the importer cannot drift apart.
+The one exception is `WorkoutActivity`, which version 14 declares but
+references from no content model: emitting it would produce an invalid
+document, so a fixture covers it instead.
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ MANUAL = ("Health", "17.4", None)
 
 
 @dataclass
-class GenerateOptions:
+class SynthesizeOptions:
     days: int = 30
     end_date: str | None = None
     scale: float = 1.0
@@ -57,7 +57,7 @@ class GenerateOptions:
 
 
 @dataclass
-class GenerateResult:
+class SynthesizeResult:
     path: Path
     start_day: date
     end_day: date
@@ -87,10 +87,10 @@ def wrapped_tag(name: str, inner: str, indent: int = 1, **attributes) -> str:
     return f"{padding}<{name}{_attributes(attributes)}>\n{inner}{padding}</{name}>\n"
 
 
-class Generator:
+class Synthesizer:
     """Builds one synthetic export."""
 
-    def __init__(self, options: GenerateOptions):
+    def __init__(self, options: SynthesizeOptions):
         self.options = options
         self.tz = timezone(timedelta(hours=options.utc_offset))
         self.random = random.Random(options.seed)
@@ -700,7 +700,7 @@ class Generator:
         yield from self.workout(day, index)
         yield self.activity_summary(day)
 
-    def write(self, destination: str | Path, on_progress=None) -> GenerateResult:
+    def write(self, destination: str | Path, on_progress=None) -> SynthesizeResult:
         options = self.options
         end_day = (
             date.fromisoformat(options.end_date) if options.end_date else date.today()
@@ -756,7 +756,7 @@ class Generator:
                 "</ClinicalDocument>\n",
             )
 
-        return GenerateResult(
+        return SynthesizeResult(
             path=path,
             start_day=start_day,
             end_day=end_day,
@@ -765,5 +765,5 @@ class Generator:
         )
 
 
-def generate(destination: str | Path, options: GenerateOptions, on_progress=None):
-    return Generator(options).write(destination, on_progress=on_progress)
+def synthesize(destination: str | Path, options: SynthesizeOptions, on_progress=None):
+    return Synthesizer(options).write(destination, on_progress=on_progress)

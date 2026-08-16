@@ -39,12 +39,12 @@ others; both work, as does an unpacked directory or a bare XML file.
 
 ## Try it without your own data
 
-The project ships a generator that writes a synthetic export with the same
-structure — realistic steps, heart rate, sleep stages, workouts with GPS
-routes, the lot:
+The project can synthesize an export for you — same structure as the real
+thing, invented data: realistic steps, heart rate, sleep stages, workouts with
+GPS routes, the lot:
 
 ```bash
-python3 -m applehealth generate --days 120 export.zip
+python3 -m applehealth synthesize --days 120 export.zip
 python3 -m applehealth import export.zip health.db
 ```
 
@@ -103,7 +103,7 @@ the run, rather than dropped.
 
 ```
 python3 -m applehealth import  EXPORT DATABASE
-python3 -m applehealth generate [OUTPUT]
+python3 -m applehealth synthesize [OUTPUT]
 python3 -m applehealth extract-schema EXPORT [-o FILE]
 python3 -m applehealth schema-diff EXPORT
 ```
@@ -126,7 +126,7 @@ Running the same import twice is safe. Every row's primary key is a hash of the
 fields that identify it, so re-importing merges: unchanged rows are ignored,
 new ones are added.
 
-### generate
+### synthesize
 
 | Option | Effect |
 | --- | --- |
@@ -232,8 +232,8 @@ it behind `datasette-auth-passwords` and HTTPS.
 ## Performance
 
 Measured on an Apple Silicon Mac with a synthetic five-year export (45 MB zip,
-2.0 M records, 286 000 GPS points), generated with
-`generate --days 1825 --scale 2`:
+2.0 M records, 286 000 GPS points), synthesized with
+`synthesize --days 1825 --scale 2`:
 
 ```
 import              53 s     (35 s of it parsing XML, the rest indexes and aggregates)
@@ -262,7 +262,7 @@ costs 11 seconds of the 53-second import.
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Tests run with `make test`; the whole
-suite works against generated data, so no real health data is ever needed —
+suite works against synthetic data, so no real health data is ever needed —
 and none should ever be committed.
 
 ## Licence

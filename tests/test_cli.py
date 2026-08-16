@@ -17,17 +17,19 @@ def run(*arguments):
     )
 
 
-class GenerateCommandTest(unittest.TestCase):
+class SynthesizeCommandTest(unittest.TestCase):
     def test_writes_an_export_and_reports_it(self):
         output = support.workspace("cli") / "Export.zip"
-        result = run("generate", "--days", "3", "--end-date", "2026-08-14", str(output))
+        result = run(
+            "synthesize", "--days", "3", "--end-date", "2026-08-14", str(output)
+        )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(output.exists())
         self.assertIn("2026-08-12 to 2026-08-14", result.stdout)
 
     def test_quiet_says_nothing(self):
         output = support.workspace("cli") / "Export.zip"
-        result = run("generate", "--days", "2", "--quiet", str(output))
+        result = run("synthesize", "--days", "2", "--quiet", str(output))
         self.assertEqual(result.stdout, "")
 
 

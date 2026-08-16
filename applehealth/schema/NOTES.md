@@ -12,11 +12,11 @@ attribute, prefixed by a version comment:
 That DTD is the authority this project builds on. `healthkit-export-v14.dtd` in
 this directory is a verbatim copy of it, used three ways:
 
-1. `applehealth/generate.py` copies it into the synthetic exports the test
-   suite runs on, and generates only elements, attributes and nesting the
-   schema declares — so generator and importer cannot drift apart.
+1. `applehealth/synthetic.py` copies it into the synthetic exports the test
+   suite runs on, and emits only elements, attributes and nesting the
+   schema declares — so synthesizer and importer cannot drift apart.
 2. `tests/test_dtd.py` asserts that every declared element is handled by the
-   importer, and `tests/test_generate.py` that every element which *can occur*
+   importer, and `tests/test_synthetic.py` that every element which *can occur*
    is exercised.
 3. `apple-health-to-sqlite schema-diff` compares a real export against it.
 
@@ -62,7 +62,7 @@ attributes are declared, but no content model references it — not even
 `<Workout>`. By this schema it cannot legally appear anywhere. The declaration
 exists for a reason (multi-sport workouts), so the importer accepts segments
 wherever they turn up, including the `WorkoutStatistics` children the schema
-does not list for them. The generator, which must emit valid documents, leaves
+does not list for them. The synthesizer, which must emit valid documents, leaves
 it out; `tests/fixtures/workouts.xml` covers it instead.
 
 **Every vision measurement carries its own unit.** `sphere` comes with

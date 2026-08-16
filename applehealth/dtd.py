@@ -4,7 +4,7 @@
 declares every element and attribute the file can contain, preceded by a
 version comment. That block is the only schema Apple ships, so this project
 treats it as authoritative: a copy lives in `applehealth/schema/`, the
-generator emits it verbatim, and `schema-diff` compares a real export to it.
+synthesizer emits it verbatim, and `schema-diff` compares a real export to it.
 
 The parser here is intentionally small. It understands `<!ELEMENT>` and
 `<!ATTLIST>` well enough to answer "which elements and attributes exist", which
@@ -80,7 +80,7 @@ class Schema:
 
         Apple's DTD declares at least one element that no content model
         references — `WorkoutActivity` in version 14 — so "declared" and "can
-        appear" are not the same set. The generator can only produce the
+        appear" are not the same set. The synthesizer can only produce the
         reachable ones without emitting invalid XML.
         """
         seen: set[str] = set()

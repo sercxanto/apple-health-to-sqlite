@@ -1,7 +1,7 @@
 """Audiograms, vision prescriptions and clinical records.
 
 Rare enough that nobody would notice them breaking, which is exactly why they
-are tested. The generated export carries one of each.
+are tested. The synthetic export carries one of each.
 """
 
 from __future__ import annotations

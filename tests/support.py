@@ -5,8 +5,8 @@ Two ways to get test data:
 * `write_export(body)` wraps a hand-written `<HealthData>` body in the bundled
   DTD and zips it. Use it for edge cases, where being able to read the exact
   input in the fixture file is worth more than realism.
-* `sample_database()` generates a realistic multi-day export and imports it.
-  It is cached for the whole test run, because generating and importing takes
+* `sample_database()` synthesizes a realistic multi-day export and imports it.
+  It is cached for the whole test run, because synthesizing and importing takes
   a moment and most tests only read from it.
 
 No test writes outside its temporary directory, and none of them touch the
@@ -23,7 +23,7 @@ import zipfile
 from functools import cache
 from pathlib import Path
 
-from applehealth import dtd, generate, pipeline
+from applehealth import dtd, pipeline, synthetic
 from applehealth.importer import ImportOptions, ImportResult
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -161,15 +161,15 @@ def one(database: Path, sql: str, parameters=()):
     return result[0][0] if result else None
 
 
-# -- generated sample data (cached for the whole run) -----------------------
+# -- synthetic sample data (cached for the whole run) -----------------------
 
 
 @cache
 def sample_export(days: int = 14, seed: int = 7, end_date: str = "2026-08-14") -> Path:
     path = workspace("sample") / "Export.zip"
-    generate.generate(
+    synthetic.synthesize(
         path,
-        generate.GenerateOptions(days=days, seed=seed, end_date=end_date),
+        synthetic.SynthesizeOptions(days=days, seed=seed, end_date=end_date),
     )
     return path
 

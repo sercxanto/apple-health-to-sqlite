@@ -27,9 +27,9 @@ format:  ## Apply formatting and safe lint fixes
 
 check: lint test  ## What CI runs, and what "done" means
 
-demo:  ## Generate a synthetic export, import it, and serve it
+demo:  ## Synthesize an export, import it, and serve it
 	@mkdir -p $(DEMO_DIR)
-	$(PYTHON) -m applehealth generate --days 120 $(DEMO_DIR)/export.zip
+	$(PYTHON) -m applehealth synthesize --days 120 $(DEMO_DIR)/export.zip
 	$(PYTHON) -m applehealth import $(DEMO_DIR)/export.zip $(DEMO_DIR)/health.db
 	$(MAKE) serve
 

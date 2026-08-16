@@ -134,7 +134,7 @@ class VersionGateTest(unittest.TestCase):
 
 
 class ExtractTest(unittest.TestCase):
-    def test_reads_the_dtd_back_out_of_a_generated_export(self):
+    def test_reads_the_dtd_back_out_of_a_synthetic_export(self):
         export = support.sample_export(days=2)
         with ExportArchive(export) as archive, archive.open_export() as stream:
             extracted = dtd.extract(stream)

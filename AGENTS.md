@@ -23,7 +23,9 @@ has a real `Export.zip`; you must treat it as off limits.
   a scratch directory you will commit, an issue, a commit message, or a
   published artifact.
 
-Everything you need to develop and test against is synthetic. Generate it.
+You never need the real export. Every input you develop and test against is
+synthetic — the real format, invented data — and you make your own:
+`python3 -m applehealth synthesize --days 120 export.zip`.
 
 ## Invariants
 
@@ -31,7 +33,7 @@ These hold across the whole project. If a change would break one, that is a
 design decision to raise with the user, not something to work around quietly.
 
 1. **The bundled DTD is the source of truth.** `applehealth/schema/*.dtd`
-   drives the generator, the handler-coverage test, and `schema-diff`. Code
+   drives the synthesizer, the handler-coverage test, and `schema-diff`. Code
    must not carry its own idea of the schema.
 2. **Every declared element is handled or visibly unhandled.** Either an
    importer handler consumes it, or it lands in the `unhandled` table and is
@@ -64,8 +66,8 @@ speak for work it did not cover.
 
 * **Follow the recipes.** Adding an element type, refreshing the schema and
   writing test data each have a procedure in CONTRIBUTING.md. They exist
-  because the steps are easy to half-do — a handler with no generator support
-  looks finished and is not.
+  because the steps are easy to half-do — a handler with no synthesizer
+  support looks finished and is not.
 * **Do not reformat what you did not change.** `ruff format` on a file you
   edited is fine; a formatting sweep buried in a behaviour change is not.
 * **Prefer extending a fixture over inventing a new sample path.** If an edge

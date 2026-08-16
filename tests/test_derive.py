@@ -171,7 +171,7 @@ class SleepViewTest(unittest.TestCase):
         )
 
 
-class GeneratedDataViewTest(unittest.TestCase):
+class SyntheticDataViewTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.database = support.sample_database()
