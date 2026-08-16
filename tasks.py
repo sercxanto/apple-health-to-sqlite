@@ -71,6 +71,16 @@ def serve() -> None:
     _python("-m", "applehealth", "serve", *_extra_args())
 
 
+def refresh_catalog() -> None:
+    """Rebuild `applehealth/catalog/` from Apple's HealthKit documentation.
+
+    The only task here that goes near the network, and the only one whose
+    output is committed rather than thrown away. Review the diff: it is the
+    documentation moving, not code.
+    """
+    _python("tools/refresh_catalog.py", *_extra_args())
+
+
 def clean() -> None:
     """Remove build artefacts, caches and the demo directory."""
     removed = []

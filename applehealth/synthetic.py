@@ -23,7 +23,7 @@ from datetime import UTC, date, datetime, timedelta, timezone
 from pathlib import Path
 from xml.sax.saxutils import quoteattr
 
-from . import dtd
+from . import catalog, dtd
 
 EXPORT_DIRECTORY = "apple_health_export"
 
@@ -87,6 +87,33 @@ def wrapped_tag(name: str, inner: str, indent: int = 1, **attributes) -> str:
     return f"{padding}<{name}{_attributes(attributes)}>\n{inner}{padding}</{name}>\n"
 
 
+def symptom_choices() -> list[tuple[str, list[str]]]:
+    """Symptom types with the value names each one accepts, from the catalogue.
+
+    Taking both sides from `applehealth/catalog` rather than listing a few here
+    keeps the synthesized pairs legal — a symptom's value has to be a member of
+    the enumeration its own type declares — and keeps this module from growing
+    a second opinion about which is which.
+    """
+    catalogue = catalog.load()
+    members = {}
+    for enum, entry in catalogue["enums"].items():
+        # People log a symptom they have. `NotPresent` and `Unspecified` are
+        # legal and do occur, but a diary made mostly of them would misrepresent
+        # what this data looks like; a fixture covers them instead.
+        felt = [
+            member["name"]
+            for member in entry["members"]
+            if (member["ordinal"] or 0) > 0
+        ]
+        members[enum] = felt or [member["name"] for member in entry["members"]]
+    return sorted(
+        (type_name, members[entry["enum"]])
+        for type_name, entry in catalogue["types"].items()
+        if entry["family"] == "Symptoms" and entry["enum"] in members
+    )
+
+
 class Synthesizer:
     """Builds one synthetic export."""
 
@@ -96,6 +123,7 @@ class Synthesizer:
         self.random = random.Random(options.seed)
         self.routes: list[tuple[str, str]] = []
         self.weight = 78.5
+        self.symptom_choices = symptom_choices()
 
     # -- helpers -----------------------------------------------------------
 
@@ -410,6 +438,33 @@ class Synthesizer:
             source=PHONE,
         )
 
+    def symptoms(self, day: date, index: int):
+        """Entries from the Health app's symptom diary.
+
+        Two things set these apart from the measured metrics: the value is a
+        name rather than a number, and an entry can cover days rather than a
+        moment — a headache logged for one afternoon, back pain logged for the
+        week it lasted.
+        """
+        if index % 5:
+            return
+        type_name, values = self.random.choice(self.symptom_choices)
+        start = self.at(day, self.random.uniform(8, 20))
+        long_episode = index % 15 == 0
+        end = start + (
+            timedelta(days=self.random.randint(2, 5))
+            if long_episode
+            else timedelta(hours=self.random.uniform(1, 6))
+        )
+        yield self.record(
+            type_name,
+            start,
+            end,
+            value=self.random.choice(values),
+            source=MANUAL,
+            metadata={"HKWasUserEntered": "1"},
+        )
+
     def workout(self, day: date, index: int):
         """A workout with events, statistics and a GPS route.
 
@@ -697,6 +752,7 @@ class Synthesizer:
         yield from self.body(day, index)
         yield from self.blood_pressure(day, index)
         yield from self.miscellaneous(day)
+        yield from self.symptoms(day, index)
         yield from self.workout(day, index)
         yield self.activity_summary(day)
 

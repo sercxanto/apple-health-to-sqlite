@@ -35,14 +35,21 @@ dev = [
 apple-health-to-sqlite = "applehealth.cli:main"
 
 [tool.setuptools]
-packages = ["applehealth", "applehealth.schema", "applehealth.datasette"]
+packages = [
+    "applehealth",
+    "applehealth.schema",
+    "applehealth.datasette",
+    "applehealth.catalog",
+]
 
 # The DTD lives inside the package so that it is importable both from a plain
 # checkout and from an installed wheel (see applehealth/dtd.py). The Datasette
-# configuration is there for the same reason: `serve` has to find it either way.
+# configuration is there for the same reason: `serve` has to find it either
+# way, and so must the category-value catalogue `derive` loads.
 [tool.setuptools.package-data]
 "applehealth.schema" = ["*.dtd", "*.md"]
 "applehealth.datasette" = ["*.yml", "*.json"]
+"applehealth.catalog" = ["*.json", "*.md"]
 
 # Task runner: `poe` with no arguments lists these. They replace a Makefile, so
 # they have to work on Windows too — no shell syntax, no `mkdir -p`, no `cp`.
@@ -89,6 +96,10 @@ script = "tasks:demo"
 [tool.poe.tasks.serve]
 help = "Serve an already-built demo database"
 script = "tasks:serve"
+
+[tool.poe.tasks.refresh-catalog]
+help = "Rebuild the category-value catalogue from Apple's documentation"
+script = "tasks:refresh_catalog"
 
 [tool.poe.tasks.clean]
 help = "Remove build artefacts, caches and the demo directory"

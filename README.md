@@ -103,7 +103,7 @@ the run, rather than dropped.
 ## Commands
 
 ```
-python3 -m applehealth import  EXPORT DATABASE
+python3 -m applehealth import EXPORT DATABASE
 python3 -m applehealth synthesize [OUTPUT]
 python3 -m applehealth extract-schema EXPORT [-o FILE]
 python3 -m applehealth schema-diff EXPORT
@@ -161,10 +161,26 @@ export_meta          locale, export date, version, the <Me> block
 unhandled            raw XML of unrecognised elements
 daily_metrics        per metric and calendar day: n / total / mean / min / max
 metric_summary       per metric, unit and source: sample count and date range
+category_types       what a category record's value means, and how Apple groups
+category_values      the value names themselves: Moderate, AsleepREM, …
 ```
 
-Views: `sleep_segments`, `nightly_sleep` (a night is named after the day you
-went to bed; the boundary is noon), `workout_summary`.
+Views: `category_samples`, `symptoms`, `sleep_segments`, `nightly_sleep` (a
+night is named after the day you went to bed; the boundary is noon),
+`workout_summary`.
+
+### Category records
+
+Sleep stages, symptoms and mindful sessions state their value as a name —
+`HKCategoryValueSeverityModerate` — and the export's schema says only that it
+is text. Which names a type can carry is documented by Apple and not by the
+file, so it is kept in `applehealth/catalog/` and loaded into the two
+`category_*` tables; `category_samples` joins them, giving `Moderate` beside
+the raw value and, where the values form a scale, an `ordinal` to sort by. The
+`symptoms` view is the same thing narrowed to the symptom diary.
+
+Nothing depends on it: a type or value the catalogue does not know keeps its
+raw name. See [applehealth/catalog/NOTES.md](applehealth/catalog/NOTES.md).
 
 ### Timezones
 

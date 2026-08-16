@@ -34,7 +34,12 @@ design decision to raise with the user, not something to work around quietly.
 
 1. **The bundled DTD is the source of truth.** `applehealth/schema/*.dtd`
    drives the synthesizer, the handler-coverage test, and `schema-diff`. Code
-   must not carry its own idea of the schema.
+   must not carry its own idea of the schema. `applehealth/catalog/` is not an
+   exception to that and must not become one: it describes what category
+   *values* mean, which the DTD cannot express, it is generated from Apple's
+   documentation rather than written by hand, nothing on the import path reads
+   it, and every lookup falls back to the raw value. Its NOTES.md spells out
+   the boundary.
 2. **Every declared element is handled or visibly unhandled.** Either an
    importer handler consumes it, or it lands in the `unhandled` table and is
    reported at the end of the run. Silently dropping data is the one outcome

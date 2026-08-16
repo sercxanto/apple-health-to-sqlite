@@ -1,0 +1,48 @@
+<!-- Category records whose value is a name rather than a number. The export's
+     DTD says only `value CDATA #IMPLIED`; which names are legal depends on the
+     type, and that mapping comes from `applehealth/catalog`. -->
+
+<!-- A symptom on the severity scale: the case that has an ordinal. -->
+<Record type="HKCategoryTypeIdentifierLowerBackPain" value="HKCategoryValueSeverityModerate"
+        sourceName="Health" sourceVersion="26.6"
+        startDate="2026-07-29 16:00:00 +0200" endDate="2026-07-29 23:59:00 +0200">
+ <MetadataEntry key="HKWasUserEntered" value="1"/>
+</Record>
+
+<!-- The bottom of the same scale, which the synthesizer deliberately does not
+     produce: logging that a symptom was absent is legal and rare. -->
+<Record type="HKCategoryTypeIdentifierHeadache" value="HKCategoryValueSeverityNotPresent"
+        sourceName="Health" sourceVersion="26.6"
+        startDate="2026-07-30 09:00:00 +0200" endDate="2026-07-30 12:00:00 +0200"/>
+
+<!-- Off the scale rather than at one end of it: no ordinal. -->
+<Record type="HKCategoryTypeIdentifierChills" value="HKCategoryValueSeverityUnspecified"
+        sourceName="Health" sourceVersion="26.6"
+        startDate="2026-07-31 09:00:00 +0200" endDate="2026-07-31 10:00:00 +0200"/>
+
+<!-- A symptom type with an enumeration of its own, which is not a scale. -->
+<Record type="HKCategoryTypeIdentifierAppetiteChanges" value="HKCategoryValueAppetiteChangesDecreased"
+        sourceName="Health" sourceVersion="26.6"
+        startDate="2026-08-01 09:00:00 +0200" endDate="2026-08-01 21:00:00 +0200"/>
+
+<!-- An episode spanning a week: one record, one local_date, seven days of it. -->
+<Record type="HKCategoryTypeIdentifierPelvicPain" value="HKCategoryValueSeverityMild"
+        sourceName="Health" sourceVersion="26.6"
+        startDate="2026-08-02 16:00:00 +0200" endDate="2026-08-08 23:59:00 +0200"/>
+
+<!-- Not a symptom: a category record from another family, and one whose value
+     is the shared `HKCategoryValueNotApplicable`. -->
+<Record type="HKCategoryTypeIdentifierMindfulSession" value="HKCategoryValueNotApplicable"
+        sourceName="iPhone" sourceVersion="17.4"
+        startDate="2026-08-03 21:00:00 +0200" endDate="2026-08-03 21:12:00 +0200"/>
+
+<!-- A category type Apple added after this catalogue was generated, standing in
+     for the next iOS release. It has to survive with its raw value showing. -->
+<Record type="HKCategoryTypeIdentifierInventedFutureSymptom" value="HKCategoryValueSeveritySevere"
+        sourceName="Health" sourceVersion="27.0"
+        startDate="2026-08-04 09:00:00 +0200" endDate="2026-08-04 10:00:00 +0200"/>
+
+<!-- And a value name the catalogue does not know, on a type it does. -->
+<Record type="HKCategoryTypeIdentifierBloating" value="HKCategoryValueSeverityInvented"
+        sourceName="Health" sourceVersion="27.0"
+        startDate="2026-08-05 09:00:00 +0200" endDate="2026-08-05 10:00:00 +0200"/>

@@ -5,25 +5,57 @@ of heart-rate samples in Datasette takes hundreds of milliseconds per click.
 `daily_metrics` pre-aggregates per metric and calendar day, which answers most
 questions in single-digit milliseconds.
 
-The views exist because three questions need SQL that is fiddly enough to be
-worth writing once: which sleep stage covered which minutes, how much sleep a
-given *night* held (a night spans two calendar dates), and what a workout
-looked like with its statistics folded back in.
+The views exist because a few questions need SQL that is fiddly enough to be
+worth writing once: what a category record's value actually says, which sleep
+stage covered which minutes, how much sleep a given *night* held (a night spans
+two calendar dates), and what a workout looked like with its statistics folded
+back in.
 """
 
 from __future__ import annotations
 
 import sqlite3
 
+from . import catalog
+
 VIEWS = """
+-- Category records — sleep stages, symptoms, mindful sessions — keep their
+-- value as the name the export uses, `HKCategoryValueSeverityModerate`. The
+-- join turns that into `Moderate`, and adds where it sits on its scale where
+-- there is one. Both joins are outer and the value falls back to the raw
+-- name: a type Apple added after this catalogue was generated still shows up
+-- here, just without the translation.
+DROP VIEW IF EXISTS category_samples;
+CREATE VIEW category_samples AS
+SELECT r.id, r.type_short, r.type, t.family, t.topic,
+       r.local_date, r.start_local, r.end_local,
+       round((r.end_ts - r.start_ts) / 60.0, 1) AS minutes,
+       coalesce(v.value_short, r.value_text) AS value_short,
+       v.ordinal, r.value_text, r.source_name
+FROM records r
+LEFT JOIN category_types t ON t.type = r.type
+LEFT JOIN category_values v ON v.value = r.value_text
+WHERE r.type LIKE 'HKCategoryTypeIdentifier%';
+
+-- The symptom diary: one row per entry the user tapped into Health. `severity`
+-- is a name (Mild, Moderate, Severe); `ordinal` is the same thing as a number,
+-- for sorting and plotting, and is NULL for the few symptom types whose values
+-- are not a scale. Entries can span days, so `minutes` is often large.
+DROP VIEW IF EXISTS symptoms;
+CREATE VIEW symptoms AS
+SELECT local_date, start_local, end_local, topic,
+       type_short AS symptom, value_short AS severity, ordinal,
+       minutes, source_name
+FROM category_samples
+WHERE family = 'Symptoms';
+
 DROP VIEW IF EXISTS sleep_segments;
 CREATE VIEW sleep_segments AS
 SELECT id, local_date, start_local, end_local,
-       replace(value_text, 'HKCategoryValueSleepAnalysis', '') AS stage,
-       round((end_ts - start_ts) / 60.0, 1) AS minutes,
+       value_short AS stage, minutes,
        date(datetime(start_local, '-12 hours')) AS night_date,
        source_name
-FROM records
+FROM category_samples
 WHERE type = 'HKCategoryTypeIdentifierSleepAnalysis';
 
 DROP VIEW IF EXISTS nightly_sleep;
@@ -94,6 +126,10 @@ def build(connection: sqlite3.Connection) -> int:
     a five-year database, and correctness after a partial re-import is worth
     more than the saved time.
     """
+    # Reference data, not derived data — but it belongs to the same rebuild,
+    # because the views below read it and an upgraded catalogue should reach an
+    # existing database without a reimport.
+    catalog.install(connection)
     connection.executescript(VIEWS)
     connection.execute("DROP TABLE IF EXISTS daily_metrics")
     connection.execute(DAILY_METRICS)

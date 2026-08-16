@@ -34,6 +34,30 @@ databases:
         sort_desc: start_ts
       workout_points:
         description: GPS points from the GPX workout routes.
+      category_samples:
+        description: >-
+          Records whose value is a name rather than a number — sleep stages,
+          symptoms, mindful sessions. value_short is that name without its
+          HKCategoryValue prefix; ordinal places it on a scale where the values
+          form one. Unrecognised names keep their raw spelling.
+        facets: [family, topic, type_short, value_short]
+        sort_desc: start_local
+      symptoms:
+        description: >-
+          The symptom diary, one row per entry. Sort by ordinal for severity;
+          an entry can span days, so minutes is often large.
+        facets: [symptom, severity, topic]
+        sort_desc: start_local
+      category_types:
+        description: >-
+          Reference data from Apple's HealthKit documentation: which value
+          enumeration each category type uses, and how Apple groups the types.
+        facets: [family]
+      category_values:
+        description: >-
+          Reference data: every documented category value name, and where it
+          sits on its scale if it has one.
+        facets: [value_enum]
       unhandled:
         description: >-
           Elements the importer has no handler for. Should be empty; if it is
@@ -79,6 +103,15 @@ databases:
           from nightly_sleep
           order by night_date desc
           limit 200
+
+      symptom_diary:
+        title: Symptom diary
+        sql: |-
+          select local_date, symptom, severity, ordinal, topic,
+                 round(minutes) as minutes, source_name
+          from symptoms
+          order by start_local desc
+          limit 400
 
       workouts:
         title: Workouts

@@ -31,7 +31,6 @@ TYPE_PREFIXES = (
     "HKDataTypeIdentifier",
     "HKWorkoutActivityType",
     "HKWorkoutEventType",
-    "HKCategoryValueSleepAnalysis",
 )
 
 #: Top-level elements, each with a dedicated handler.
