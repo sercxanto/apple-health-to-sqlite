@@ -61,6 +61,38 @@ Report honestly: if something is untested, unfinished, or you worked around a
 failure rather than fixing it, say so plainly rather than letting `poe check`
 speak for work it did not cover.
 
+## Committing is the human's job
+
+Every commit here is made by a person who has read the diff first. That review
+is the point of the rule, and an agent that commits its own work quietly
+removes it.
+
+* **Do not run `git commit`**, and nothing that commits as a side effect either
+  — no `merge`, `rebase`, `revert`, `cherry-pick`, `stash`, `push`.
+  Leave the change in the working tree, where the user can read 
+  it, run it, and undo it.
+* **Write the commit message instead.** When the work is done, hand over the
+  message you would have used — English, subject line plus body, why rather
+  than what — as text in your reply for the user to paste. Not into a file, not
+  through `git commit -F`.
+* **Read-only git is fine**, and often the right thing: `status`, `diff`, `log`,
+  `show`.
+
+## The user's environment stays as you found it
+
+Anything you install has to be removable by deleting one directory.
+
+* **Use a virtualenv** for dev tooling — `python3 -m venv .venv` in the
+  checkout (`.venv/` is ignored), or a throwaway one under your scratch
+  directory. Install into it with its own `pip`, and call its binaries by path
+  rather than activating a shell you cannot keep.
+* **Never install into the user's environment**: no `pipx install`, no
+  `pip install --user`, no `brew install`, no editing shell profiles. pipx in
+  particular looks harmless because it isolates each tool, but it still puts
+  commands on the user's PATH and leaves them there after you are gone.
+* **If a task genuinely needs something installed globally**, say so and let
+  the user do it.
+
 ## Working style here
 
 * **Follow the recipes.** Adding an element type, refreshing the schema and
