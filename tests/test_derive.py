@@ -57,6 +57,57 @@ class DailyMetricsTest(unittest.TestCase):
         self.assertIn(("BodyMass", "kg"), units)
 
 
+class MetricSummaryTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.database, _ = support.import_export(support.export_from_fixture("records"))
+
+    def test_counts_agree_with_the_records_table(self):
+        self.assertEqual(
+            support.one(self.database, "select sum(samples) from metric_summary"),
+            support.one(
+                self.database,
+                "select count(*) from records where local_date is not null",
+            ),
+        )
+
+    def test_splits_one_metric_by_source(self):
+        """Two step-count samples from two devices, so two rows."""
+        rows = support.rows(
+            self.database,
+            "select source_name, samples from metric_summary "
+            "where type_short = 'StepCount' order by source_name",
+        )
+        self.assertEqual(rows, [("Apple Watch", 1), ("iPhone", 1)])
+
+    def test_records_the_period_covered(self):
+        first_seen, last_seen = support.rows(
+            self.database,
+            "select first_seen, last_seen from metric_summary "
+            "where type_short = 'BodyMass'",
+        )[0]
+        self.assertEqual((first_seen, last_seen), ("2026-03-05", "2026-03-05"))
+
+    def test_covers_non_numeric_metrics_too(self):
+        """Unlike daily_metrics, which only aggregates numbers."""
+        self.assertEqual(
+            support.one(
+                self.database,
+                "select samples from metric_summary where type_short = 'SleepAnalysis'",
+            ),
+            1,
+        )
+
+    def test_is_rebuilt_rather_than_appended_to(self):
+        before = support.one(self.database, "select count(*) from metric_summary")
+        support.import_export(
+            support.export_from_fixture("records"), database=self.database
+        )
+        self.assertEqual(
+            support.one(self.database, "select count(*) from metric_summary"), before
+        )
+
+
 class SleepViewTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

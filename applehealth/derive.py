@@ -56,6 +56,23 @@ SELECT w.id, w.local_date, w.start_local, w.activity_short AS activity,
 FROM workouts w;
 """
 
+# "What is actually in my export?" is the first question anyone asks, and
+# answering it from `records` means a full scan plus a grouping temp b-tree:
+# four seconds on a five-year database, which Datasette kills at its one-second
+# default. Precomputing it here turns that into a lookup over a few dozen rows.
+METRIC_SUMMARY = """
+CREATE TABLE metric_summary AS
+SELECT type_short, type, unit, source_name,
+       count(*)          AS samples,
+       min(local_date)   AS first_seen,
+       max(local_date)   AS last_seen,
+       min(start_ts)     AS first_ts,
+       max(start_ts)     AS last_ts
+FROM records
+WHERE local_date IS NOT NULL
+GROUP BY type, unit, source_name
+"""
+
 DAILY_METRICS = """
 CREATE TABLE daily_metrics AS
 SELECT type_short, type, local_date, unit,
@@ -83,6 +100,8 @@ def build(connection: sqlite3.Connection) -> int:
     connection.execute(
         "CREATE INDEX idx_daily_type_date ON daily_metrics (type_short, local_date)"
     )
+    connection.execute("DROP TABLE IF EXISTS metric_summary")
+    connection.execute(METRIC_SUMMARY)
     connection.execute(
         """
         UPDATE workouts SET n_points = (

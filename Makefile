@@ -33,9 +33,12 @@ demo:  ## Generate a synthetic export, import it, and serve it
 	$(PYTHON) -m applehealth import $(DEMO_DIR)/export.zip $(DEMO_DIR)/health.db
 	$(MAKE) serve
 
+# Datasette's configuration-directory mode: it picks up metadata.yml,
+# settings.json and every *.db next to them, so the settings live in a file
+# instead of in flags nobody remembers. See README, "Settings".
 serve:  ## Serve an already-built demo database
-	datasette $(DEMO_DIR)/health.db -m datasette/metadata.yml \
-		--setting sql_time_limit_ms 10000 -p $(PORT)
+	cp datasette/metadata.yml datasette/settings.json $(DEMO_DIR)/
+	datasette $(DEMO_DIR) -p $(PORT)
 
 clean:  ## Remove build artifacts and the demo directory
 	rm -rf $(DEMO_DIR) build dist *.egg-info .ruff_cache

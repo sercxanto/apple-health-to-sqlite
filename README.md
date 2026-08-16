@@ -159,6 +159,7 @@ extra_metadata       MetadataEntry and Attachment of the rarer elements above
 export_meta          locale, export date, version, the <Me> block
 unhandled            raw XML of unrecognised elements
 daily_metrics        per metric and calendar day: n / total / mean / min / max
+metric_summary       per metric, unit and source: sample count and date range
 ```
 
 Views: `sleep_segments`, `nightly_sleep` (a night is named after the day you
@@ -173,9 +174,18 @@ day would split a night's sleep across two dates.
 
 ## Datasette
 
+Put the database next to the two configuration files and point Datasette at
+the directory:
+
 ```bash
-datasette health.db -m datasette/metadata.yml --setting sql_time_limit_ms 10000
+mkdir -p serve && cp datasette/metadata.yml datasette/settings.json serve/
+ln -s "$PWD/health.db" serve/health.db
+datasette serve/
 ```
+
+That is Datasette's *configuration directory* mode: it picks up `metadata.yml`,
+`settings.json` and every `*.db` in the directory, so nothing has to be
+repeated on the command line. `make demo` and `make serve` do exactly this.
 
 The bundled [metadata.yml](datasette/metadata.yml) adds facets and nine ready
 queries: steps per day, weight over time, resting heart rate against HRV, sleep
@@ -183,6 +193,27 @@ per night, workouts, weekly totals, heart rate on one day, a workout route on a
 map, and an inventory of what your export actually contains. The database file
 must be named `health.db`, since Datasette keys the configuration on the
 filename.
+
+### Settings
+
+**Settings are not metadata.** In Datasette 0.65 a `settings:` block inside
+`metadata.yml` is *silently ignored* — no warning, no error, the default stays
+in force. They belong in `settings.json` beside it (configuration directory
+mode, above), or on the command line:
+
+```bash
+datasette health.db -m datasette/metadata.yml --setting sql_time_limit_ms 10000
+```
+
+[settings.json](datasette/settings.json) raises `sql_time_limit_ms` from its
+1000 ms default to 10 000. Not because the queries need it — see
+[Performance](#performance) — but because the first query against a large
+database pays for reading cold pages off disk, and 1.3 GB of cold cache can
+take longer than a second all by itself.
+
+If a query does get cut off, raising the limit is the second thing to try. The
+first is to check whether it is scanning `records` when `daily_metrics` or
+`metric_summary` would answer it.
 
 Useful plugins:
 
@@ -215,13 +246,18 @@ Query times on that database:
 | Query | Time |
 | --- | --- |
 | steps per day across five years (`daily_metrics`) | 0.5 ms |
+| what is in my export (`metric_summary`) | 0.1 ms |
 | heart rate for a single day (`records`, 640 rows) | 1.4 ms |
-| `nightly_sleep` across five years | 53 ms |
+| `nightly_sleep` across five years | 52 ms |
 | full scan of every heart-rate record (worst case) | 271 ms |
 
 Filter on `type_short` **and** `local_date`/`start_ts` — that is what the
-indexes are for — and prefer `daily_metrics` over `records` where it answers
-the question.
+indexes are for — and prefer `daily_metrics` or `metric_summary` over `records`
+where they answer the question. The inventory query is the illustration:
+against `records` it needs a full scan and a grouping temp b-tree, four seconds
+on this database and well past the point where Datasette gives up. Precomputed
+at import time, it is a lookup over nineteen rows. The whole derivation step
+costs 11 seconds of the 53-second import.
 
 ## Contributing
 

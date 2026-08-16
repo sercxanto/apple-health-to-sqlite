@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import os
 import resource
+import shutil
 import sys
 import unittest
 
@@ -26,6 +27,10 @@ from . import support
 #: sits around 50 MB regardless of export size; the headroom is for the Python
 #: runtime and the test suite around it.
 MEMORY_LIMIT_MB = 400
+
+#: Budget per canned query on this database. See the test for how it was
+#: chosen; it is a proxy for "does not scan `records`", not a latency target.
+CANNED_QUERY_LIMIT_S = 0.2
 
 SLOW_TESTS_ENABLED = os.environ.get("APPLEHEALTH_SLOW_TESTS") == "1"
 
@@ -76,6 +81,50 @@ class LargeExportTest(unittest.TestCase):
         self.assertGreater(
             support.one(self.database, "select count(*) from daily_metrics"), days
         )
+
+    def test_no_canned_query_approaches_datasette_s_time_limit(self):
+        """The regression this catches is a query that quietly starts scanning
+        `records` — fine on a fixture, seconds on a real export, and Datasette
+        gives up at one second by default.
+
+        The threshold cannot be Datasette's own limit: this database is a
+        fraction of a real five-year export, so a query that takes four seconds
+        there takes well under one second here and would slip through. It is
+        set from measurement instead. On this data the slowest canned query
+        runs in 9 ms and the inventory query, before it was moved to
+        `metric_summary`, took 620 ms. 200 ms sits between the two with room on
+        both sides for slower hardware.
+        """
+        import sqlite3
+        import time
+
+        from .test_metadata_queries import DATASETTE, load_queries
+
+        if DATASETTE is None:
+            self.skipTest("datasette is not installed")
+
+        named = support.workspace("timing") / "health.db"
+        shutil.copy(self.database, named)
+        day = support.one(named, "select max(local_date) from records")
+
+        connection = sqlite3.connect(named)
+        try:
+            for query in load_queries(named):
+                with self.subTest(query=query["name"]):
+                    parameters = {"day": day} if ":day" in query["sql"] else {}
+                    started = time.perf_counter()
+                    connection.execute(query["sql"], parameters).fetchall()
+                    elapsed = time.perf_counter() - started
+                    self.assertLess(
+                        elapsed,
+                        CANNED_QUERY_LIMIT_S,
+                        f"{query['name']} took {elapsed * 1000:.0f} ms on "
+                        f"{support.one(named, 'select count(*) from records'):,} "
+                        f"records — most likely it is scanning `records` where "
+                        f"`daily_metrics` or `metric_summary` would do",
+                    )
+        finally:
+            connection.close()
 
     def test_indexed_lookup_stays_fast(self):
         """A day of heart rate out of a year of samples should be instant."""

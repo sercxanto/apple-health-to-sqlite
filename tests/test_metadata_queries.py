@@ -21,7 +21,9 @@ from pathlib import Path
 
 from . import support
 
-METADATA = Path(__file__).resolve().parent.parent / "datasette" / "metadata.yml"
+CONFIG_DIRECTORY = Path(__file__).resolve().parent.parent / "datasette"
+METADATA = CONFIG_DIRECTORY / "metadata.yml"
+SETTINGS = CONFIG_DIRECTORY / "settings.json"
 DATASETTE = shutil.which("datasette")
 
 
@@ -130,6 +132,74 @@ class MetadataQueryTest(unittest.TestCase):
         finally:
             connection.close()
         self.assertGreater(len(rows), 0)
+
+
+@unittest.skipIf(DATASETTE is None, "datasette is not installed")
+class SettingsTest(unittest.TestCase):
+    """Settings are not metadata, and getting that wrong fails silently."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.directory = support.workspace("configdir")
+        shutil.copy(METADATA, cls.directory / "metadata.yml")
+        shutil.copy(SETTINGS, cls.directory / "settings.json")
+        shutil.copy(support.sample_database(days=6), cls.directory / "health.db")
+
+    def effective_settings(self) -> dict:
+        result = subprocess.run(
+            [DATASETTE, str(self.directory), "--get", "/-/settings.json"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return json.loads(result.stdout)
+
+    def test_configuration_directory_applies_settings_json(self):
+        self.assertEqual(
+            self.effective_settings()["sql_time_limit_ms"],
+            json.loads(SETTINGS.read_text())["sql_time_limit_ms"],
+        )
+
+    def test_the_time_limit_is_raised_above_the_default(self):
+        self.assertGreater(self.effective_settings()["sql_time_limit_ms"], 1000)
+
+    def test_configuration_directory_also_applies_the_metadata(self):
+        result = subprocess.run(
+            [
+                DATASETTE,
+                str(self.directory),
+                "--get",
+                "/health/steps_per_day.json?_shape=array",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        self.assertGreater(len(json.loads(result.stdout)), 0)
+
+    def test_settings_inside_metadata_are_ignored(self):
+        """The trap this configuration exists to avoid: Datasette accepts a
+        `settings:` block in metadata.yml and does nothing with it."""
+        directory = support.workspace("badconfig")
+        shutil.copy(support.sample_database(days=6), directory / "health.db")
+        metadata = directory / "metadata.yml"
+        metadata.write_text(
+            METADATA.read_text() + "\nsettings:\n  sql_time_limit_ms: 9000\n"
+        )
+        result = subprocess.run(
+            [
+                DATASETTE,
+                str(directory / "health.db"),
+                "-m",
+                str(metadata),
+                "--get",
+                "/-/settings.json",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        self.assertEqual(json.loads(result.stdout)["sql_time_limit_ms"], 1000)
 
 
 if __name__ == "__main__":

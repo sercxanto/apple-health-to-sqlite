@@ -1,0 +1,6 @@
+{
+  "sql_time_limit_ms": 10000,
+  "max_returned_rows": 2000,
+  "facet_time_limit_ms": 3000,
+  "suggest_facets": false
+}
