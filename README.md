@@ -12,7 +12,7 @@ months merges into the same database instead of forcing a rebuild.
 
 ```bash
 python3 -m applehealth import Export.zip health.db
-datasette health.db -m datasette/metadata.yml
+datasette health.db -m applehealth/datasette/metadata.yml
 ```
 
 ## Requirements
@@ -48,7 +48,8 @@ python3 -m applehealth synthesize --days 120 export.zip
 python3 -m applehealth import export.zip health.db
 ```
 
-Or in one step: `make demo`.
+Or in one step: `python3 -m applehealth demo`, which synthesizes, imports and
+serves in one go.
 
 ## The schema
 
@@ -178,16 +179,16 @@ Put the database next to the two configuration files and point Datasette at
 the directory:
 
 ```bash
-mkdir -p serve && cp datasette/metadata.yml datasette/settings.json serve/
-ln -s "$PWD/health.db" serve/health.db
-datasette serve/
+python3 -m applehealth serve serve/
 ```
 
-That is Datasette's *configuration directory* mode: it picks up `metadata.yml`,
-`settings.json` and every `*.db` in the directory, so nothing has to be
-repeated on the command line. `make demo` and `make serve` do exactly this.
+That assembles Datasette's *configuration directory*: it picks up
+`metadata.yml`, `settings.json` and every `*.db` in the directory, so nothing
+has to be repeated on the command line. The command copies the two
+configuration files in for you; put the database there yourself, or let
+`python3 -m applehealth demo` build the whole directory from synthetic data.
 
-The bundled [metadata.yml](datasette/metadata.yml) adds facets and nine ready
+The bundled [metadata.yml](applehealth/datasette/metadata.yml) adds facets and nine ready
 queries: steps per day, weight over time, resting heart rate against HRV, sleep
 per night, workouts, weekly totals, heart rate on one day, a workout route on a
 map, and an inventory of what your export actually contains. The database file
@@ -202,10 +203,10 @@ in force. They belong in `settings.json` beside it (configuration directory
 mode, above), or on the command line:
 
 ```bash
-datasette health.db -m datasette/metadata.yml --setting sql_time_limit_ms 10000
+datasette health.db -m applehealth/datasette/metadata.yml --setting sql_time_limit_ms 10000
 ```
 
-[settings.json](datasette/settings.json) raises `sql_time_limit_ms` from its
+[settings.json](applehealth/datasette/settings.json) raises `sql_time_limit_ms` from its
 1000 ms default to 10 000. Not because the queries need it — see
 [Performance](#performance) — but because the first query against a large
 database pays for reading cold pages off disk, and 1.3 GB of cold cache can
@@ -261,7 +262,7 @@ costs 11 seconds of the 53-second import.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Tests run with `make test`; the whole
+See [CONTRIBUTING.md](CONTRIBUTING.md). Tests run with `poe test`; the whole
 suite works against synthetic data, so no real health data is ever needed —
 and none should ever be committed.
 

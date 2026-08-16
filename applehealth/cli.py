@@ -10,7 +10,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import __version__, dtd, pipeline, schema_tools, synthetic
+from . import __version__, demo, dtd, pipeline, schema_tools, synthetic
 from .archive import ExportNotFound
 from .importer import ImportOptions
 
@@ -88,6 +88,29 @@ def build_parser() -> argparse.ArgumentParser:
         "schema-diff", help="compare an export's schema with the bundled one"
     )
     compare.add_argument("export")
+
+    demonstrate = commands.add_parser(
+        "demo", help="synthesize an export, import it, and serve it"
+    )
+    demonstrate.add_argument(
+        "directory", nargs="?", default=demo.DEFAULT_DIRECTORY, help="where to build it"
+    )
+    demonstrate.add_argument("--days", type=int, default=120)
+    demonstrate.add_argument("--port", type=int, default=demo.DEFAULT_PORT)
+    demonstrate.add_argument(
+        "--no-serve", action="store_true", help="build the database but do not serve it"
+    )
+
+    server = commands.add_parser(
+        "serve", help="serve an already-built database with Datasette"
+    )
+    server.add_argument(
+        "directory",
+        nargs="?",
+        default=demo.DEFAULT_DIRECTORY,
+        help=f"directory holding {demo.DATABASE_NAME}",
+    )
+    server.add_argument("--port", type=int, default=demo.DEFAULT_PORT)
 
     return parser
 
@@ -197,11 +220,40 @@ def command_schema_diff(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_demo(args: argparse.Namespace) -> int:
+    # Before spending a minute building a database we cannot then show.
+    if not args.no_serve:
+        demo.require_datasette()
+
+    target = demo.prepare(args.directory)
+    export = target / "export.zip"
+    database = demo.database_path(target)
+
+    print(f"Synthesizing {args.days} days of invented data into {export}")
+    synthetic.synthesize(export, synthetic.SynthesizeOptions(days=args.days))
+    print(f"Importing into {database}")
+    result = pipeline.run_import(export, str(database), ImportOptions(progress=False))
+    print(
+        f"Imported {result.elapsed_s:.1f}s, "
+        f"{Path(database).stat().st_size / 1e6:.1f} MB"
+    )
+
+    if args.no_serve:
+        return 0
+    return demo.serve(target, args.port)
+
+
+def command_serve(args: argparse.Namespace) -> int:
+    return demo.serve(args.directory, args.port)
+
+
 COMMANDS = {
     "import": command_import,
     "synthesize": command_synthesize,
     "extract-schema": command_extract_schema,
     "schema-diff": command_schema_diff,
+    "demo": command_demo,
+    "serve": command_serve,
 }
 
 
@@ -209,7 +261,12 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         return COMMANDS[args.command](args)
-    except (dtd.SchemaError, ExportNotFound, FileNotFoundError) as error:
+    except (
+        dtd.SchemaError,
+        ExportNotFound,
+        FileNotFoundError,
+        demo.DatasetteMissing,
+    ) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
 

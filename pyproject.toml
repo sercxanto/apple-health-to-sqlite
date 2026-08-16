@@ -27,6 +27,7 @@ dev = [
     "datasette>=0.65,<1",
     "datasette-cluster-map",
     "datasette-vega",
+    "poethepoet>=0.24",
     "ruff>=0.6",
 ]
 
@@ -34,12 +35,64 @@ dev = [
 apple-health-to-sqlite = "applehealth.cli:main"
 
 [tool.setuptools]
-packages = ["applehealth", "applehealth.schema"]
+packages = ["applehealth", "applehealth.schema", "applehealth.datasette"]
 
 # The DTD lives inside the package so that it is importable both from a plain
-# checkout and from an installed wheel (see applehealth/dtd.py).
+# checkout and from an installed wheel (see applehealth/dtd.py). The Datasette
+# configuration is there for the same reason: `serve` has to find it either way.
 [tool.setuptools.package-data]
 "applehealth.schema" = ["*.dtd", "*.md"]
+"applehealth.datasette" = ["*.yml", "*.json"]
+
+# Task runner: `poe` with no arguments lists these. They replace a Makefile, so
+# they have to work on Windows too — no shell syntax, no `mkdir -p`, no `cp`.
+# Anything that runs Python is a `script` task in tasks.py, which explains why;
+# ruff is called directly. Extra arguments are passed on: `poe serve -- --port 9000`.
+[tool.poe.tasks.test]
+help = "Run the fast test suite"
+script = "tasks:test"
+
+[tool.poe.tasks.test-all]
+help = "Run every test, including the slow large-export test"
+script = "tasks:test"
+env = { APPLEHEALTH_SLOW_TESTS = "1" }
+
+# What the `slow` CI job runs: the large-export test on its own, so it can be
+# reproduced locally without sitting through the rest of the suite.
+[tool.poe.tasks.test-slow]
+help = "Run only the slow large-export test"
+script = "tasks:test_slow"
+env = { APPLEHEALTH_SLOW_TESTS = "1" }
+
+[tool.poe.tasks.lint]
+help = "Check formatting and lint rules"
+sequence = [
+    { cmd = "ruff check ." },
+    { cmd = "ruff format --check ." },
+]
+
+[tool.poe.tasks.format]
+help = "Apply formatting and safe lint fixes"
+sequence = [
+    { cmd = "ruff format ." },
+    { cmd = "ruff check --fix ." },
+]
+
+[tool.poe.tasks.check]
+help = "Lint and fast tests — what CI runs, and what \"done\" means"
+sequence = ["lint", "test"]
+
+[tool.poe.tasks.demo]
+help = "Synthesize an export, import it, and serve it"
+script = "tasks:demo"
+
+[tool.poe.tasks.serve]
+help = "Serve an already-built demo database"
+script = "tasks:serve"
+
+[tool.poe.tasks.clean]
+help = "Remove build artefacts, caches and the demo directory"
+script = "tasks:clean"
 
 [tool.ruff]
 line-length = 88

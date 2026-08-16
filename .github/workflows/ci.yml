@@ -19,12 +19,12 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install
         run: pip install -e ".[dev]"
+      # Through poe, so CI runs exactly what `poe lint` and `poe test` run
+      # locally. The tasks live in pyproject.toml.
       - name: Lint
-        run: |
-          ruff check .
-          ruff format --check .
+        run: poe lint
       - name: Test
-        run: python -m unittest discover -s tests -t . -v
+        run: poe test
 
   slow:
     # The large-export test takes a few minutes; run it once, not per version.
@@ -37,6 +37,4 @@ jobs:
       - name: Install
         run: pip install -e ".[dev]"
       - name: Slow tests
-        env:
-          APPLEHEALTH_SLOW_TESTS: "1"
-        run: python -m unittest tests.test_large_export -v
+        run: poe test-slow

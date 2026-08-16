@@ -19,9 +19,12 @@ import subprocess
 import unittest
 from pathlib import Path
 
+from applehealth import demo
+
 from . import support
 
-CONFIG_DIRECTORY = Path(__file__).resolve().parent.parent / "datasette"
+# The same directory `serve` copies from, so this tests what is actually shipped.
+CONFIG_DIRECTORY = demo.config_dir()
 METADATA = CONFIG_DIRECTORY / "metadata.yml"
 SETTINGS = CONFIG_DIRECTORY / "settings.json"
 DATASETTE = shutil.which("datasette")

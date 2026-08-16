@@ -1,6 +1,6 @@
 """Slow test: the two properties that only show up at size.
 
-Opt in with `APPLEHEALTH_SLOW_TESTS=1` (or `make test-all`). It synthesizes a few
+Opt in with `APPLEHEALTH_SLOW_TESTS=1` (or `poe test-all`). It synthesizes a few
 hundred thousand records, which takes a minute or two.
 
 What it guards:

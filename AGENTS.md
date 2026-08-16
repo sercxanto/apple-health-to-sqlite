@@ -52,14 +52,13 @@ design decision to raise with the user, not something to work around quietly.
 
 ## Definition of done
 
-`make check` passes — lint clean, fast suite green — and any behaviour you
+`poe check` passes — lint clean, fast suite green — and any behaviour you
 added has a test that fails without your change. If you touched the importer,
-the schema, or the database layout, also run
-`APPLEHEALTH_SLOW_TESTS=1 make test-all`; invariants 3 and 4 are only really
-exercised there.
+the schema, or the database layout, also run `poe test-all`; invariants 3 and 4
+are only really exercised there.
 
 Report honestly: if something is untested, unfinished, or you worked around a
-failure rather than fixing it, say so plainly rather than letting `make check`
+failure rather than fixing it, say so plainly rather than letting `poe check`
 speak for work it did not cover.
 
 ## Working style here

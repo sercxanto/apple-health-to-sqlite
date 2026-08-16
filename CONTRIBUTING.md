@@ -33,21 +33,43 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-If you prefer not to have a virtualenv, `pipx install datasette` and
-`pipx install ruff` give you the two commands the Makefile calls.
+If you prefer not to have a virtualenv, `pipx install poethepoet`,
+`pipx install datasette` and `pipx install ruff` give you the three commands
+the tasks call.
 
 ## Commands
 
+The task runner is [poe](https://poethepoet.natn.io/), configured in
+`pyproject.toml` under `[tool.poe.tasks]`. `poe` on its own lists everything
+below with its description.
+
 | Command | What it does |
 | --- | --- |
-| `make test` | fast test suite (a few seconds) |
-| `make test-all` | everything, including the slow large-export test |
-| `make lint` | `ruff check` and `ruff format --check` |
-| `make format` | apply formatting and safe fixes |
-| `make check` | lint + fast tests — what CI runs |
-| `make demo` | synthesize an export, import it, serve it |
-| `make serve` | serve an already-built demo database |
-| `make clean` | remove build artefacts and `demo/` |
+| `poe test` | fast test suite (a few seconds) |
+| `poe test-all` | everything, including the slow large-export test |
+| `poe test-slow` | only the slow large-export test — what the `slow` CI job runs |
+| `poe lint` | `ruff check` and `ruff format --check` |
+| `poe format` | apply formatting and safe fixes |
+| `poe check` | lint + fast tests — what CI runs |
+| `poe demo` | synthesize an export, import it, serve it |
+| `poe serve` | serve an already-built demo database |
+| `poe clean` | remove build artefacts, caches and `demo/` |
+
+Arguments after `--` reach the underlying command, so `poe demo -- --days 30`
+and `poe serve -- --port 9000` work. `demo` and `serve` are thin wrappers
+around `python3 -m applehealth demo` and `… serve`, which you can equally call
+directly.
+
+There was a Makefile here until August 2026. It was replaced because half its
+recipes were Unix shell — `mkdir -p`, `cp`, `find -exec` — so none of it ran on
+Windows. Two rules keep that from creeping back:
+
+* **Nothing in `[tool.poe.tasks]` may rely on a shell.** No pipes, no `&&`, no
+  Unix utilities. A task is one command, a `sequence` of commands, or a Python
+  function.
+* **Anything that runs Python goes through `tasks.py`.** A bare `python` is not
+  on the PATH on every machine that has Python; poe resolves it for `script`
+  tasks and not for `cmd` tasks. `tasks.py` says more about this.
 
 Run a single test file or case with unittest directly:
 
@@ -75,8 +97,10 @@ applehealth/
     db.py           DDL, indexes, content-addressed row ids
     derive.py       daily_metrics and the views
     synthetic.py    synthetic exports
-datasette/metadata.yml   facets and canned queries
-tests/                   unittest suite; tests/fixtures/*.xml are hand-written
+    demo.py         building a directory for Datasette, and serving it
+    datasette/      metadata.yml and settings.json — facets, canned queries
+tasks.py            the development tasks poe calls
+tests/              unittest suite; tests/fixtures/*.xml are hand-written
 ```
 
 `pipeline.py` exists so `routes.py` can import from `importer.py` without a
@@ -85,7 +109,7 @@ cycle. Start there when tracing what an import does.
 ## Conventions
 
 Formatting and lint rules are ruff's job, configured in `pyproject.toml`; run
-`make format` rather than arguing about style. Beyond that:
+`poe format` rather than arguing about style. Beyond that:
 
 * **Names spell things out.** `correlation_id`, not `cid`. The exception is
   loop-local scratch in a two-line block.
@@ -109,9 +133,10 @@ multi-gigabyte file, and "install this first" is the step where that stops
 happening.
 
 Dev-only dependencies are fine when they earn their place — currently
-`datasette` (the thing the output is for, and what validates `metadata.yml`)
-and `ruff`. To add one, say in the pull request what it does that the standard
-library cannot, and whether it is needed at runtime or only for development.
+`datasette` (the thing the output is for, and what validates `metadata.yml`),
+`ruff`, and `poethepoet` (the task runner, which is why there is no Makefile).
+To add one, say in the pull request what it does that the standard library
+cannot, and whether it is needed at runtime or only for development.
 Adding a runtime dependency needs a stronger case than convenience.
 
 ## Recipes
@@ -181,7 +206,7 @@ obviously fake ones, and commit *that*.
 
 ## Pull requests
 
-* `make check` passes.
+* `poe check` passes.
 * One concern per pull request. Formatting churn in files you did not otherwise
   touch makes review harder — leave it out.
 * Say why, not just what. If the change is driven by something in a real

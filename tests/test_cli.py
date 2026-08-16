@@ -6,6 +6,8 @@ import subprocess
 import sys
 import unittest
 
+from applehealth import demo
+
 from . import support
 
 
@@ -124,6 +126,66 @@ class SchemaCommandTest(unittest.TestCase):
         self.assertIn("+ attribute Record/@futureField", result.stdout)
         # The point of the command: declarations only, never measurements.
         self.assertNotIn("987654", result.stdout)
+
+
+class DemoCommandTest(unittest.TestCase):
+    """`demo` and `serve` replace what the Makefile used to do in shell.
+
+    Serving itself needs Datasette and a free port, so what is checked here is
+    everything up to the handover: that the directory Datasette is pointed at
+    ends up holding a database *and* the configuration next to it, which is the
+    whole reason the command exists.
+    """
+
+    def test_demo_builds_a_directory_datasette_can_serve(self):
+        target = support.workspace("demo") / "demo"
+        result = run("demo", "--days", "2", "--no-serve", str(target))
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        self.assertTrue((target / "health.db").exists())
+        # Datasette keys canned queries on the filename, so it has to be this.
+        self.assertEqual(demo.database_path(target).name, "health.db")
+        for name in demo.CONFIG_FILES:
+            self.assertTrue((target / name).exists(), name)
+
+    def test_demo_imports_the_data_it_synthesized(self):
+        target = support.workspace("demo") / "demo"
+        run("demo", "--days", "2", "--no-serve", str(target))
+        self.assertGreater(
+            support.one(target / "health.db", "select count(*) from records"), 0
+        )
+
+    def test_serve_without_a_database_explains_itself(self):
+        empty = support.workspace("demo")
+        result = run("serve", str(empty))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("does not exist", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+
+    def test_serve_does_not_create_the_directory_it_was_given(self):
+        """A typo in the path should be an error, not a stray empty folder."""
+        missing = support.workspace("demo") / "typo"
+        run("serve", str(missing))
+        self.assertFalse(missing.exists())
+
+
+class ConfigurationTest(unittest.TestCase):
+    def test_the_bundled_configuration_ships_with_the_package(self):
+        """Inside the package, so `serve` works from an installed wheel too."""
+        directory = demo.config_dir()
+        self.assertEqual(directory.parent.name, "applehealth")
+        for name in demo.CONFIG_FILES:
+            self.assertTrue((directory / name).exists(), name)
+
+    def test_prepare_refreshes_the_configuration(self):
+        target = support.workspace("demo") / "serving"
+        (stale := target / "metadata.yml").parent.mkdir(parents=True)
+        stale.write_text("title: out of date\n")
+
+        demo.prepare(target)
+        self.assertEqual(
+            stale.read_text(), (demo.config_dir() / "metadata.yml").read_text()
+        )
 
 
 class ParserTest(unittest.TestCase):
