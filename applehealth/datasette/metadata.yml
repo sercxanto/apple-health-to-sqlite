@@ -25,10 +25,18 @@ databases:
           answers the question — total where the samples add up (steps,
           calories), mean where they do not (heart rate, weight) — and
           aggregation says which it took. Both are empty for a metric Apple
-          documents no aggregation style for. Note that the grouping is not
-          per source: where a phone and a watch both count steps, both are in
-          the sum; metric_summary splits them.
+          documents no aggregation style for. The grouping is not per source, so
+          where a phone and a watch both count steps both are in the sum;
+          deduplicated_value reconciles those days to the one number the Health
+          app shows (null where a single source made day_value right already),
+          and daily_metrics_by_source has the per-source split.
         facets: [type_short, aggregation]
+      daily_metrics_by_source:
+        description: >-
+          daily_metrics split by source: two rows where a phone and a watch both
+          recorded a metric on a day. The raw per-source facts behind
+          daily_metrics.deduplicated_value.
+        facets: [type_short, source_name, aggregation]
       metric_summary:
         description: >-
           One row per metric, unit and source: how many samples there are and
@@ -76,10 +84,15 @@ databases:
           not, Apple has extended the export format.
 
     queries:
+      # coalesce(deduplicated_value, day_value): where a phone and a watch both
+      # counted, deduplicated_value is the reconciled number the Health app
+      # shows; where only one source did, it is null and day_value already reads
+      # right. Reading total instead would double-count the overlapping days.
       steps_per_day:
         title: Steps per day
         sql: |-
-          select local_date, cast(total as integer) as steps
+          select local_date,
+                 cast(coalesce(deduplicated_value, day_value) as integer) as steps
           from daily_metrics
           where type_short = 'StepCount'
           order by local_date desc
@@ -134,16 +147,22 @@ databases:
           order by local_date desc
           limit 200
 
+      # coalesce(deduplicated_value, day_value) throughout, so a phone and a
+      # watch counting the same steps, calories or kilometres are reconciled
+      # rather than summed — see the note on steps_per_day.
       weekly_totals:
         title: Weekly totals
         sql: |-
           select strftime('%Y-W%W', local_date) as week,
-                 cast(sum(case when type_short = 'StepCount' then total end)
+                 cast(sum(case when type_short = 'StepCount'
+                               then coalesce(deduplicated_value, day_value) end)
                       as integer) as steps,
                  cast(sum(case when type_short = 'ActiveEnergyBurned'
-                               then total end) as integer) as active_kcal,
+                               then coalesce(deduplicated_value, day_value) end)
+                      as integer) as active_kcal,
                  round(sum(case when type_short = 'DistanceWalkingRunning'
-                                then total end), 1) as km
+                                then coalesce(deduplicated_value, day_value) end),
+                       1) as km
           from daily_metrics
           group by week
           order by week desc

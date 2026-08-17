@@ -98,6 +98,7 @@ applehealth/
     timestamps.py   Apple's timestamp format
     db.py           DDL, indexes, content-addressed row ids
     derive.py       daily_metrics and the views
+    dedup.py        folding several sources into one de-duplicated day
     synthetic.py    synthetic exports
     demo.py         building a directory for Datasette, and serving it
     datasette/      metadata.yml and settings.json — facets, canned queries

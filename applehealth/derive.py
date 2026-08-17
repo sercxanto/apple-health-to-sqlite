@@ -4,7 +4,10 @@ Raw `records` is the wrong table to explore interactively: faceting five years
 of heart-rate samples in Datasette takes hundreds of milliseconds per click.
 `daily_metrics` pre-aggregates per metric and calendar day, which answers most
 questions in single-digit milliseconds, and — via the catalogue — says which of
-its aggregates the metric actually means.
+its aggregates the metric actually means. `daily_metrics_by_source` keeps that
+same aggregation split by source, and `daily_metrics.deduplicated_value` (filled
+by `dedup`) folds several sources back into the one number the Health app shows,
+so a Watch and an iPhone recording the same steps do not read as twice as many.
 
 The views exist because a few questions need SQL that is fiddly enough to be
 worth writing once: what a category record's value actually says, which sleep
@@ -17,7 +20,7 @@ from __future__ import annotations
 
 import sqlite3
 
-from . import catalog
+from . import catalog, dedup
 
 VIEWS = """
 -- Category records — sleep stages, symptoms, mindful sessions — keep their
@@ -116,14 +119,45 @@ GROUP BY type, unit, source_name
 # replacement, and a metric the catalogue has not heard of keeps them and
 # leaves `day_value` empty rather than picking wrong.
 #
-# One caveat `day_value` cannot fix: the grouping is per type, day and unit,
-# not per source. Where an iPhone and a Watch both record steps, both sets of
-# samples are in `records` and a cumulative `day_value` adds them up — a
-# higher number than the Health app shows. `metric_summary` is the table that
-# splits by source.
+# The grouping is per type, day and unit, not per source — so where an iPhone
+# and a Watch both record steps, a cumulative `day_value` adds both sets up and
+# reads higher than the Health app shows. Two columns answer that: `dedup`
+# splits the same aggregation out by source, and `deduplicated_value` (filled
+# by `dedup.build` for the multi-source days only) reconstructs the single
+# number Health would show. `day_value` stays the honest per-day sum beside it.
 DAILY_METRICS = """
 CREATE TABLE daily_metrics AS
 SELECT r.type_short, r.type, r.local_date, r.unit,
+       count(*)     AS n,
+       sum(r.value) AS total,
+       round(avg(r.value), 3) AS mean,
+       min(r.value) AS min_value,
+       max(r.value) AS max_value,
+       q.aggregation,
+       CASE q.aggregation
+            WHEN 'cumulative' THEN sum(r.value)
+            WHEN 'discrete'   THEN round(avg(r.value), 3)
+       END AS day_value,
+       -- Filled afterwards by `dedup.build`, and only where more than one
+       -- source contributed to a cumulative day; NULL means `day_value`
+       -- already reads right.
+       CAST(NULL AS REAL) AS deduplicated_value
+FROM records r
+LEFT JOIN quantity_types q ON q.type = r.type
+WHERE r.value IS NOT NULL AND r.local_date IS NOT NULL
+GROUP BY r.type, r.local_date, r.unit
+"""
+
+# The same per-day aggregation as `daily_metrics`, but kept split by source —
+# the pure-fact table behind the double-counting story. Where one metric has
+# two sources on a day, it has two rows here, and their `total`s are what a
+# `daily_metrics` cumulative `day_value` sums together. No catalogue judgement
+# and no interval maths live here: it only declines to merge what `records`
+# already keeps apart, which is why `deduplicated_value` is reconstructed from
+# `records` rather than from this table.
+DAILY_METRICS_BY_SOURCE = """
+CREATE TABLE daily_metrics_by_source AS
+SELECT r.type_short, r.type, r.local_date, r.unit, r.source_name,
        count(*)     AS n,
        sum(r.value) AS total,
        round(avg(r.value), 3) AS mean,
@@ -137,7 +171,7 @@ SELECT r.type_short, r.type, r.local_date, r.unit,
 FROM records r
 LEFT JOIN quantity_types q ON q.type = r.type
 WHERE r.value IS NOT NULL AND r.local_date IS NOT NULL
-GROUP BY r.type, r.local_date, r.unit
+GROUP BY r.type, r.local_date, r.unit, r.source_name
 """
 
 
@@ -158,6 +192,16 @@ def build(connection: sqlite3.Connection) -> int:
     connection.execute(
         "CREATE INDEX idx_daily_type_date ON daily_metrics (type_short, local_date)"
     )
+    connection.execute("DROP TABLE IF EXISTS daily_metrics_by_source")
+    connection.execute(DAILY_METRICS_BY_SOURCE)
+    connection.execute(
+        "CREATE INDEX idx_daily_source_type_date "
+        "ON daily_metrics_by_source (type_short, local_date)"
+    )
+    # Reconcile the multi-source days now that daily_metrics exists to hold the
+    # result, and before metric_summary — order among the rest does not matter,
+    # but this one writes into a table the line above just built.
+    dedup.build(connection)
     connection.execute("DROP TABLE IF EXISTS metric_summary")
     connection.execute(METRIC_SUMMARY)
     connection.execute(

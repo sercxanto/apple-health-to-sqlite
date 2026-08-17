@@ -80,6 +80,25 @@
         sourceName="iPhone" sourceVersion="17.4"
         startDate="2026-08-01 12:00:00 +0200" endDate="2026-08-01 12:30:00 +0200"/>
 
+<!-- Two sources overlapping on one day, for the de-duplication sweep. The
+     Watch covers the full hour and the Phone half-overlaps it: an honest sum is
+     12 km, but the Phone's overlapped half-hour is the Watch's, so Health shows
+     10. The Watch covers more of the day, so it wins the overlap; the Phone
+     keeps only its non-overlapping 09:00–09:15, half its span, so half its 4 km.
+     deduplicated_value = 8 + 4×0.5 = 10; total stays 12. -->
+<Record type="HKQuantityTypeIdentifierDistanceWalkingRunning" unit="km" value="8"
+        sourceName="Watch" sourceVersion="10.3"
+        startDate="2026-08-05 08:00:00 +0200" endDate="2026-08-05 09:00:00 +0200"/>
+<Record type="HKQuantityTypeIdentifierDistanceWalkingRunning" unit="km" value="4"
+        sourceName="Phone" sourceVersion="17.4"
+        startDate="2026-08-05 08:45:00 +0200" endDate="2026-08-05 09:15:00 +0200"/>
+
+<!-- One source on its own day: nothing to reconcile, so deduplicated_value
+     stays NULL and day_value already reads right. -->
+<Record type="HKQuantityTypeIdentifierDistanceWalkingRunning" unit="km" value="5"
+        sourceName="Phone" sourceVersion="17.4"
+        startDate="2026-08-06 08:00:00 +0200" endDate="2026-08-06 09:00:00 +0200"/>
+
 <!-- No unit, no value: allowed by the DTD, and it happens. -->
 <Record type="HKCategoryTypeIdentifierMindfulSession"
         sourceName="iPhone" sourceVersion="17.4"

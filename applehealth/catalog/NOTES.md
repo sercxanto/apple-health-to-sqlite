@@ -62,8 +62,13 @@ category pages have. Three identifiers state nothing at all
 **What `day_value` still cannot tell you** is which sources contributed. The
 grouping is per type, day and unit — so where an iPhone and a Watch both
 record steps, a cumulative `day_value` adds both sets up and reads higher than
-the Health app does. `metric_summary` is the table that splits by source. This
-is not new to `day_value`; `total` always did it.
+the Health app does. This is not new to `day_value`; `total` always did it.
+Three tables answer it, none of them here: `metric_summary` and
+`daily_metrics_by_source` split by source, and `daily_metrics.deduplicated_value`
+reconstructs the single de-duplicated number the app shows. That last one is a
+heuristic — a per-day source priority the export cannot state — and lives in
+`dedup.py` for the same reason the catalogue lives here: it is interpretation
+laid beside the raw sum, never replacing it.
 
 ## What this is not
 

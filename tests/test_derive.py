@@ -100,6 +100,64 @@ class DailyMetricsTest(unittest.TestCase):
         )
 
 
+class DeduplicationTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.database, _ = support.import_export(support.export_from_fixture("records"))
+
+    def dedup(self, type_short: str, local_date: str) -> tuple:
+        return support.rows(
+            self.database,
+            "select total, deduplicated_value from daily_metrics "
+            "where type_short = ? and local_date = ?",
+            (type_short, local_date),
+        )[0]
+
+    def test_complementary_sources_deduplicate_to_the_sum(self):
+        """Watch in the morning, iPhone later, no overlap: the two 08-01 step
+        samples reconcile to the same 1700 they sum to — nothing to drop."""
+        total, deduplicated = self.dedup("StepCount", "2026-08-01")
+        self.assertEqual(total, 1700.0)
+        self.assertEqual(deduplicated, 1700.0)
+
+    def test_an_overlap_is_prorated_below_the_sum(self):
+        """8 km all-hour Watch and a half-overlapping 4 km Phone sum to 12, but
+        the Phone's overlapped half is the Watch's, so Health shows 10."""
+        total, deduplicated = self.dedup("DistanceWalkingRunning", "2026-08-05")
+        self.assertEqual(total, 12.0)
+        self.assertEqual(deduplicated, 10.0)
+
+    def test_a_single_source_day_stays_null(self):
+        """One source has nothing to reconcile, so the sweep leaves it alone and
+        `day_value` is the number to read."""
+        total, deduplicated = self.dedup("DistanceWalkingRunning", "2026-08-06")
+        self.assertEqual(total, 5.0)
+        self.assertIsNone(deduplicated)
+
+    def test_discrete_metrics_are_never_deduplicated(self):
+        """Averaging two sources' heart rates inflates nothing, so it is left
+        NULL rather than reconciled."""
+        self.assertEqual(
+            support.one(
+                self.database,
+                "select count(*) from daily_metrics "
+                "where aggregation = 'discrete' and deduplicated_value is not null",
+            ),
+            0,
+        )
+
+    def test_by_source_keeps_the_sources_apart(self):
+        """The per-source table has the two step rows `daily_metrics` folds into
+        one, so both the split and the deduplicated whole are on hand."""
+        rows = support.rows(
+            self.database,
+            "select source_name, total from daily_metrics_by_source "
+            "where type_short = 'StepCount' and local_date = '2026-08-01' "
+            "order by source_name",
+        )
+        self.assertEqual(rows, [("Apple Watch", 1200.0), ("iPhone", 500.0)])
+
+
 class MetricSummaryTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
