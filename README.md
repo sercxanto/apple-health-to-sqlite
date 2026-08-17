@@ -159,10 +159,12 @@ vision_prescriptions one row per eye, every measurement with its own unit
 extra_metadata       MetadataEntry and Attachment of the rarer elements above
 export_meta          locale, export date, version, the <Me> block
 unhandled            raw XML of unrecognised elements
-daily_metrics        per metric and calendar day: n / total / mean / min / max
+daily_metrics        per metric and calendar day: n / total / mean / min / max,
+                     plus day_value — whichever of those the metric means
 metric_summary       per metric, unit and source: sample count and date range
 category_types       what a category record's value means, and how Apple groups
 category_values      the value names themselves: Moderate, AsleepREM, …
+quantity_types       whether a metric's day adds up or averages out
 ```
 
 Views: `category_samples`, `symptoms`, `sleep_segments`, `nightly_sleep` (a
@@ -181,6 +183,29 @@ the raw value and, where the values form a scale, an `ordinal` to sort by. The
 
 Nothing depends on it: a type or value the catalogue does not know keeps its
 raw name. See [applehealth/catalog/NOTES.md](applehealth/catalog/NOTES.md).
+
+### Sums and averages
+
+A day of step samples adds up to the day's steps; a day of heart rates
+averages to the day's heart rate, and adding them up gives a number that means
+nothing. Which metric is which is documented by Apple as an aggregation style,
+cumulative or discrete, so it is in the catalogue too, as `quantity_types`.
+
+`daily_metrics` therefore has an `aggregation` column and a `day_value` one —
+the sum for cumulative metrics, the mean for discrete ones. It is a signpost,
+not a replacement: `total`, `mean`, `min_value` and `max_value` are all still
+there, and a metric the catalogue has never heard of keeps them and leaves
+`day_value` empty rather than picking wrong. The point is that one query now
+works for every metric:
+
+```sql
+select local_date, day_value from daily_metrics where type_short = 'StepCount'
+```
+
+Swap in `BodyMass` or `HeartRate` and it still reads correctly. One thing it
+does not do: `daily_metrics` groups per metric, day and unit, not per source,
+so where an iPhone and a Watch both count steps, both are in the sum. Use
+`metric_summary` to see the split.
 
 ### Timezones
 

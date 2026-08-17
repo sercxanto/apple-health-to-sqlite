@@ -1,11 +1,22 @@
-"""Regenerate `applehealth/catalog/category_values.json` from Apple's docs.
+"""Regenerate the catalogues in `applehealth/catalog` from Apple's docs.
 
 The export's DTD declares `value CDATA #IMPLIED` and stops there, so nothing in
 the file says that a `HKCategoryTypeIdentifierLowerBackPain` record carries one
 of the five `HKCategoryValueSeverity` names while a
 `HKCategoryTypeIdentifierSleepAnalysis` record carries one of eight sleep
-stages. Apple documents that per identifier, and this script turns the
-documentation into the lookup table `applehealth/catalog` ships.
+stages. Nor does it say that a day of `StepCount` samples is meant to be added
+up while a day of `HeartRate` samples is not. Apple documents both per
+identifier, and this script turns the documentation into the two lookup tables
+`applehealth/catalog` ships:
+
+* `category_values.json` — which value names a category type can carry.
+* `quantity_types.json` — whether a quantity type's samples are cumulative or
+  discrete, which is what tells `daily_metrics` whether `total` or `mean` is
+  the meaningful number.
+
+They are two files rather than one so that their diffs stay separately
+readable: a documentation reshuffle among the symptoms should not land in the
+same review as one among the nutrients. `--only` refreshes a single file.
 
 **Why a generator and not a hand-written table.** There are roughly ninety
 category identifiers across a dozen value enumerations, and Apple adds a few
@@ -35,7 +46,8 @@ Nothing here is on the import path.
 
 Usage:
 
-    poe refresh-catalog          # rewrite the committed JSON
+    poe refresh-catalog                        # rewrite both committed files
+    poe refresh-catalog -- --only quantities   # just one of them
     poe refresh-catalog -- --dry-run
 
 Read `applehealth/catalog/NOTES.md` before changing what this writes; it
@@ -56,7 +68,9 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
-OUTPUT = ROOT / "applehealth" / "catalog" / "category_values.json"
+CATALOG = ROOT / "applehealth" / "catalog"
+CATEGORY_OUTPUT = CATALOG / "category_values.json"
+QUANTITY_OUTPUT = CATALOG / "quantity_types.json"
 
 DOCS = "https://developer.apple.com/documentation/healthkit"
 DATA = "https://developer.apple.com/tutorials/data/documentation/healthkit"
@@ -65,6 +79,9 @@ DATA = "https://developer.apple.com/tutorials/data/documentation/healthkit"
 #: The symptom diary lives on its own page, linked from the index as a section
 #: with a single entry, so it has to be walked separately.
 INDEX_PAGES = ("hkcategorytypeidentifier", "symptom-type-identifiers")
+
+#: The one index page that lists every quantity type identifier.
+QUANTITY_INDEX = "hkquantitytypeidentifier"
 
 #: Doc sections that are API surface rather than identifiers.
 SKIP_SECTIONS = frozenset({"Initializers", "Instance Properties", "Operators"})
@@ -106,6 +123,20 @@ _EXTERNAL_ID_RE = re.compile(r"^c:(?:@E@\w+)?@(HK\w+)$")
 #: pages for mindful sessions and the like phrase it). Both name the
 #: enumeration; the capture group is it.
 _VALUE_SYMBOL_RE = re.compile(r"^(HKCategoryValue\w*)(?:\.\w+)?$")
+
+#: How a quantity type's page states its aggregation style. The style itself is
+#: prose — "measure cumulative values" — but the sentence always anchors it on
+#: a link to `HKQuantityAggregationStyle`, and that link is what makes the
+#: adjective a fact rather than a word that happens to appear nearby.
+#:
+#: The span between the two tolerates the phrasings Apple actually uses, which
+#: differ more than the category pages do: "(described in …)", "(see …)", and
+#: the audio-exposure wording "discrete values of the equivalent continuous
+#: sound pressure level, described in …". It stops at a sentence end, so an
+#: adjective from one sentence cannot bind to a link in the next.
+_AGGREGATION_RE = re.compile(
+    r"measures? (cumulative|discrete)\b[^.@]*@HKQuantityAggregationStyle[/@]"
+)
 
 
 class DocsError(RuntimeError):
@@ -186,6 +217,60 @@ def value_enum_of(page: dict[str, Any]) -> str | None:
             if match:
                 return match.group(1)
     return None
+
+
+def inline_text(node: Any, out: list[str]) -> list[str]:
+    """Flatten a content node into text, symbol links inlined as `@Name@`.
+
+    The JSON splits a sentence into runs, so "measure cumulative values
+    (described in HKQuantityAggregationStyle)" arrives as two text runs with a
+    reference between them. Joining them back into one string is what lets a
+    regular expression read the sentence the way a person does; the `@…@`
+    markers keep the links visible to it, and cannot collide with the prose.
+    """
+    if isinstance(node, dict):
+        if node.get("type") == "text":
+            out.append(node.get("text", ""))
+        elif node.get("type") == "codeVoice":
+            out.append(node.get("code", ""))
+        elif node.get("type") == "reference":
+            symbol = node.get("identifier", "").split("/documentation/HealthKit/")[-1]
+            out.append(f"@{symbol}@")
+        else:
+            for key in ("inlineContent", "content", "items"):
+                if key in node:
+                    inline_text(node[key], out)
+    elif isinstance(node, list):
+        for value in node:
+            inline_text(value, out)
+    return out
+
+
+def discussion(page: dict[str, Any]) -> str:
+    """The page's prose sections, flattened by `inline_text`."""
+    return "".join(
+        text
+        for section in page.get("primaryContentSections", [])
+        if section.get("kind") == "content"
+        for text in inline_text(section, [])
+    )
+
+
+def aggregation_of(page: dict[str, Any]) -> str | None:
+    """Whether this quantity type's samples are `cumulative` or `discrete`.
+
+    Which is the fact `daily_metrics` needs: a day of cumulative samples adds
+    up to the day's number, a day of discrete ones averages to it. Apple states
+    it in the discussion, linking either `HKQuantityAggregationStyle` or one of
+    its members — `discreteEquivalentContinuousLevel`, on the audio-exposure
+    types — the same way category pages link either an enumeration or one of
+    its values.
+
+    `None` where the page says nothing, which for a handful of recent
+    identifiers is simply the case: they have no discussion at all.
+    """
+    match = _AGGREGATION_RE.search(discussion(page))
+    return match.group(1) if match else None
 
 
 def collect_types() -> dict[str, dict[str, str | None]]:
@@ -284,8 +369,79 @@ def members_of(enum: str) -> list[dict[str, Any]]:
     return members
 
 
+def collect_quantity_types() -> dict[str, str | None]:
+    """Walk the quantity index and return `{page path: family}`.
+
+    `family` is the heading the index files a type under — Activity, Nutrition,
+    Vital signs — the same grouping the category catalogue carries. There is no
+    finer topic here: the quantity index is one page and one level deep.
+    """
+    page = fetch(QUANTITY_INDEX)
+    found: dict[str, str | None] = {}
+    for title, references in sections(page):
+        for reference in references:
+            url = reference.get("url", "")
+            if f"/{QUANTITY_INDEX}/" not in url:
+                continue
+            path = url.rsplit("/documentation/healthkit/", 1)[-1]
+            found[path] = None if title == UNGROUPED else title
+    if not found:
+        raise DocsError(
+            "no quantity type identifiers found — the documentation layout has "
+            f"probably changed; check the JSON at {DATA}/{QUANTITY_INDEX}.json"
+        )
+    return found
+
+
+def build_quantities() -> dict[str, Any]:
+    """Crawl the quantity identifiers and assemble their catalogue."""
+    types: dict[str, dict[str, Any]] = {}
+
+    paths = collect_quantity_types()
+    print(f"{len(paths)} quantity type identifiers", file=sys.stderr)
+
+    for path in sorted(paths):
+        page = fetch(path)
+        identifier = external_name(page)
+        if identifier is None:
+            raise DocsError(f"{path} has no usable externalID")
+        types[identifier] = {
+            "aggregation": aggregation_of(page),
+            "family": paths[path],
+        }
+
+    silent = sorted(k for k, v in types.items() if not v["aggregation"])
+    if len(silent) == len(types):
+        # One undocumented type is normal; all of them means the phrasing this
+        # reads has changed, and writing the file would quietly empty
+        # `day_value` for every metric in every database that reran `derive`.
+        raise DocsError(
+            "no quantity type states an aggregation style — the wording the "
+            "discussions use has probably changed; check the JSON at "
+            f"{DATA}/{QUANTITY_INDEX}/stepcount.json"
+        )
+    if silent:
+        # Not fatal: a type whose page states nothing keeps its `total` and
+        # `mean` and simply gets no `day_value`. Worth seeing, though.
+        print(
+            f"{len(silent)} without a documented aggregation style: "
+            + ", ".join(silent),
+            file=sys.stderr,
+        )
+
+    return {
+        "_comment": (
+            "Generated by tools/refresh_catalog.py from Apple's HealthKit "
+            "documentation. Do not edit by hand. See NOTES.md."
+        ),
+        "source": DOCS,
+        "retrieved": dt.date.today().isoformat(),
+        "types": dict(sorted(types.items())),
+    }
+
+
 def build() -> dict[str, Any]:
-    """Crawl the documentation and assemble the catalogue."""
+    """Crawl the documentation and assemble the category catalogue."""
     types: dict[str, dict[str, Any]] = {}
     enums: dict[str, dict[str, Any]] = {}
 
@@ -327,33 +483,56 @@ def build() -> dict[str, Any]:
     }
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="print a summary instead of writing the catalogue",
-    )
-    arguments = parser.parse_args(argv)
-
-    try:
-        catalog = build()
-    except DocsError as error:
-        print(f"error: {error}", file=sys.stderr)
-        return 1
-
+def category_summary(catalog: dict[str, Any]) -> str:
     documented = sum(1 for entry in catalog["types"].values() if entry["enum"])
-    summary = (
+    return (
         f"{len(catalog['types'])} types ({documented} with a value enumeration), "
         f"{len(catalog['enums'])} enumerations"
     )
-    if arguments.dry_run:
-        print(summary)
-        return 0
 
-    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT.write_text(json.dumps(catalog, indent=2, sort_keys=False) + "\n")
-    print(f"{OUTPUT.relative_to(ROOT)}: {summary}")
+
+def quantity_summary(catalog: dict[str, Any]) -> str:
+    styles = [entry["aggregation"] for entry in catalog["types"].values()]
+    return (
+        f"{len(styles)} types ({styles.count('cumulative')} cumulative, "
+        f"{styles.count('discrete')} discrete, {styles.count(None)} unstated)"
+    )
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument(
+        "--only",
+        choices=("categories", "quantities"),
+        help="refresh one catalogue instead of both, keeping the other's diff out",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="print a summary instead of writing the catalogues",
+    )
+    arguments = parser.parse_args(argv)
+
+    wanted = {
+        "categories": (CATEGORY_OUTPUT, build, category_summary),
+        "quantities": (QUANTITY_OUTPUT, build_quantities, quantity_summary),
+    }
+    if arguments.only:
+        wanted = {arguments.only: wanted[arguments.only]}
+
+    for output, crawl, summarise in wanted.values():
+        try:
+            catalog = crawl()
+        except DocsError as error:
+            print(f"error: {error}", file=sys.stderr)
+            return 1
+        summary = summarise(catalog)
+        if arguments.dry_run:
+            print(f"{output.relative_to(ROOT)}: {summary} (not written)")
+            continue
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(json.dumps(catalog, indent=2, sort_keys=False) + "\n")
+        print(f"{output.relative_to(ROOT)}: {summary}")
     return 0
 
 

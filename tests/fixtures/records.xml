@@ -64,6 +64,22 @@
         sourceName="Smart Scale" sourceVersion="6.2.1"
         startDate="2026-03-05 23:30:00 -0500" endDate="2026-03-05 23:30:00 -0500"/>
 
+<!-- Two heart rates on one day: their mean (70) is the day's number and their
+     sum (140) is nothing at all, which is what `day_value` has to get right. -->
+<Record type="HKQuantityTypeIdentifierHeartRate" unit="count/min" value="60"
+        sourceName="Apple Watch" sourceVersion="10.3"
+        startDate="2026-08-01 06:00:00 +0200" endDate="2026-08-01 06:00:00 +0200"/>
+<Record type="HKQuantityTypeIdentifierHeartRate" unit="count/min" value="80"
+        sourceName="Apple Watch" sourceVersion="10.3"
+        startDate="2026-08-01 18:00:00 +0200" endDate="2026-08-01 18:00:00 +0200"/>
+
+<!-- A quantity type no catalogue has heard of, which is what every type looks
+     like for the months between an iOS release and a catalogue refresh. It
+     aggregates like any other; only `aggregation` and `day_value` stay empty. -->
+<Record type="HKQuantityTypeIdentifierInventedFutureMetric" unit="count" value="7"
+        sourceName="iPhone" sourceVersion="17.4"
+        startDate="2026-08-01 12:00:00 +0200" endDate="2026-08-01 12:30:00 +0200"/>
+
 <!-- No unit, no value: allowed by the DTD, and it happens. -->
 <Record type="HKCategoryTypeIdentifierMindfulSession"
         sourceName="iPhone" sourceVersion="17.4"

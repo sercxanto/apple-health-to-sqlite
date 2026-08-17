@@ -21,9 +21,14 @@ databases:
         sort_desc: start_ts
       daily_metrics:
         description: >-
-          Aggregated per metric and calendar day. Use total for sums (steps,
-          calories) and mean for series (heart rate, weight).
-        facets: [type_short]
+          Aggregated per metric and calendar day. day_value is the one that
+          answers the question — total where the samples add up (steps,
+          calories), mean where they do not (heart rate, weight) — and
+          aggregation says which it took. Both are empty for a metric Apple
+          documents no aggregation style for. Note that the grouping is not
+          per source: where a phone and a watch both count steps, both are in
+          the sum; metric_summary splits them.
+        facets: [type_short, aggregation]
       metric_summary:
         description: >-
           One row per metric, unit and source: how many samples there are and
@@ -58,6 +63,13 @@ databases:
           Reference data: every documented category value name, and where it
           sits on its scale if it has one.
         facets: [value_enum]
+      quantity_types:
+        description: >-
+          Reference data from Apple's HealthKit documentation: whether a
+          metric's samples are cumulative (a day of them adds up) or discrete
+          (a day of them averages), which is what fills in
+          daily_metrics.day_value.
+        facets: [aggregation, family]
       unhandled:
         description: >-
           Elements the importer has no handler for. Should be empty; if it is

@@ -53,7 +53,7 @@ below with its description.
 | `poe check` | lint + fast tests — what CI runs |
 | `poe demo` | synthesize an export, import it, serve it |
 | `poe serve` | serve an already-built demo database |
-| `poe refresh-catalog` | rebuild the category-value catalogue from Apple's docs |
+| `poe refresh-catalog` | rebuild the catalogue from Apple's docs |
 | `poe clean` | remove build artefacts, caches and `demo/` |
 
 Arguments after `--` reach the underlying command, so `poe demo -- --days 30`
@@ -92,7 +92,7 @@ applehealth/
     archive.py      finding files inside an export (zip, directory, bare XML)
     dtd.py          parsing, version-gating and diffing Apple's schema
     schema/         the committed DTD — see its NOTES.md
-    catalog/        what category values mean — see its NOTES.md
+    catalog/        what values mean, and how days add up — see its NOTES.md
     importer.py     streaming XML → rows, one handler per element
     routes.py       GPX tracks → workout_points
     timestamps.py   Apple's timestamp format
@@ -193,25 +193,31 @@ non-obvious parts of the format live.
 Supported versions are 14 and newer. Adding support for older exports is not a
 goal; see NOTES.md for what would be involved.
 
-### Refreshing the category-value catalogue
+### Refreshing the catalogue
 
-`applehealth/catalog/category_values.json` says what a category record's value
-name means — that `HKCategoryValueSeverityModerate` is `Moderate`, and that it
-is the third rung of a four-rung scale. It is generated from Apple's HealthKit
-documentation, so refreshing it needs no export and no permission:
+Two generated files, both read from Apple's HealthKit documentation, so
+refreshing them needs no export and no permission:
+
+* `applehealth/catalog/category_values.json` — what a category record's value
+  name means: that `HKCategoryValueSeverityModerate` is `Moderate`, and the
+  third rung of a four-rung scale.
+* `applehealth/catalog/quantity_types.json` — whether a quantity type's
+  samples are cumulative or discrete, which is what `daily_metrics` reads to
+  fill in `day_value`.
 
 ```bash
 poe refresh-catalog
 ```
 
-A couple of minutes and about a hundred requests. Review the diff as
-documentation moving rather than code changing, and read
-`applehealth/catalog/NOTES.md` first if you are changing *what* is generated —
-in particular before touching `SCALE_ENUMS`, the one field there that is a
-judgement rather than something Apple states.
+A few minutes and a couple of hundred requests; `--only categories` or
+`--only quantities` does one of them. Review the diff as documentation moving
+rather than code changing, and read `applehealth/catalog/NOTES.md` first if you
+are changing *what* is generated — in particular before touching `SCALE_ENUMS`,
+the one field there that is a judgement rather than something Apple states.
 
-Worth doing when Apple ships new category types, which is most iOS releases.
-Nothing breaks in the meantime: an unknown type or value keeps its raw name.
+Worth doing when Apple ships new types, which is most iOS releases. Nothing
+breaks in the meantime: an unknown type or value keeps its raw name and its
+aggregates, and only loses the interpretation.
 
 ### Test data
 

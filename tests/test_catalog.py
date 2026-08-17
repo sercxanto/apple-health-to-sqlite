@@ -1,9 +1,10 @@
-"""The category-value catalogue: what a record's `value` name means.
+"""The catalogue: what a record's value means, where the export cannot say.
 
 The export says `value="HKCategoryValueSeverityModerate"` and its DTD says
-nothing more than `CDATA`. These tests cover the layer that turns that into
-`Moderate`, and — more importantly — that it stays out of the way when it does
-not recognise something.
+nothing more than `CDATA`; it says `value="1200"` without saying that a day of
+those adds up while a day of heart rates does not. These tests cover the layer
+that supplies both, and — more importantly — that it stays out of the way when
+it does not recognise something.
 """
 
 from __future__ import annotations
@@ -68,6 +69,41 @@ class CatalogDataTest(unittest.TestCase):
         shorts = {member["short"] for member in members}
         self.assertTrue({"InBed", "Awake", "AsleepCore", "AsleepREM"} <= shorts)
         self.assertNotIn("AllAsleepValues", shorts, "that one is a Set, not a value")
+
+
+class QuantityCatalogDataTest(unittest.TestCase):
+    """The other half of the catalogue: how a day of samples adds up."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.types = catalog.load_quantities()["types"]
+
+    def test_every_entry_is_a_quantity_identifier(self):
+        for type_name in self.types:
+            self.assertTrue(type_name.startswith("HKQuantityTypeIdentifier"), type_name)
+
+    def test_aggregation_is_one_of_the_two_styles_or_unstated(self):
+        """`daily_metrics` switches on these three cases and nothing else."""
+        for type_name, entry in self.types.items():
+            self.assertIn(
+                entry["aggregation"], ("cumulative", "discrete", None), type_name
+            )
+
+    def test_the_two_styles_are_both_well_populated(self):
+        """A crawl that silently stopped matching would land everything in one
+        bucket — or in neither — rather than in the rough halves Apple has."""
+        styles = [entry["aggregation"] for entry in self.types.values()]
+        self.assertGreater(styles.count("cumulative"), 20)
+        self.assertGreater(styles.count("discrete"), 20)
+
+    def test_the_metrics_the_docs_lean_on_read_the_way_they_read(self):
+        """Steps add up, heart rate does not. README and `derive` both say so."""
+        self.assertEqual(
+            self.types["HKQuantityTypeIdentifierStepCount"]["aggregation"], "cumulative"
+        )
+        self.assertEqual(
+            self.types["HKQuantityTypeIdentifierHeartRate"]["aggregation"], "discrete"
+        )
 
 
 class CategorySamplesTest(unittest.TestCase):

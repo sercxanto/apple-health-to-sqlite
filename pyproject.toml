@@ -45,7 +45,7 @@ packages = [
 # The DTD lives inside the package so that it is importable both from a plain
 # checkout and from an installed wheel (see applehealth/dtd.py). The Datasette
 # configuration is there for the same reason: `serve` has to find it either
-# way, and so must the category-value catalogue `derive` loads.
+# way, and so must the catalogue `derive` loads.
 [tool.setuptools.package-data]
 "applehealth.schema" = ["*.dtd", "*.md"]
 "applehealth.datasette" = ["*.yml", "*.json"]

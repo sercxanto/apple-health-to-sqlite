@@ -1,4 +1,4 @@
-"""What the values of category records mean.
+"""What a record's values mean, where the export cannot say.
 
 The DTD declares `value CDATA #IMPLIED` and can say no more, because the
 meaning of a category record's value depends on its type: a
@@ -8,12 +8,19 @@ record one of eight sleep stages. That mapping exists only in Apple's HealthKit
 documentation, so `tools/refresh_catalog.py` reads it from there and writes
 `category_values.json`, which this module loads into two small tables.
 
+Quantity records raise the same kind of question about their numbers rather
+than their names: 1200 steps and 1500 steps make 2700 steps, while 62 bpm and
+70 bpm make 66 bpm, not 132. The DTD cannot express that either, and Apple
+documents it per identifier as an aggregation style — cumulative or discrete.
+`quantity_types.json` is that fact, and `daily_metrics` reads it to fill in
+`day_value`.
+
 **This is not a second schema.** The DTD stays the source of truth for what an
 export contains; the catalogue only attaches meaning to values it already
 contains, and nothing on the import path consults it. A type or value missing
 from the catalogue — Apple adds both with every iOS release — imports exactly
-as it did before and simply shows its raw name, which is why the views join
-outwards and fall back to `value_text`.
+as it did before and simply shows its raw name or an empty `day_value`, which
+is why every join is an outer one.
 
 Loaded into the database rather than applied during the import for two
 reasons: the raw `value_text` stays untouched, so nothing is lost in
@@ -30,6 +37,7 @@ from pathlib import Path
 from typing import Any
 
 DATA_FILE = Path(__file__).parent / "category_values.json"
+QUANTITY_FILE = Path(__file__).parent / "quantity_types.json"
 
 SCHEMA = """
 DROP TABLE IF EXISTS category_types;
@@ -56,13 +64,32 @@ CREATE TABLE category_values (
     -- Mild to Moderate is not a quantity.
     ordinal INTEGER
 ) WITHOUT ROWID;
+
+DROP TABLE IF EXISTS quantity_types;
+CREATE TABLE quantity_types (
+    type TEXT PRIMARY KEY,
+    -- How a day of these samples turns into one number. 'cumulative' means
+    -- they add up (steps, energy, water); 'discrete' means each stands on its
+    -- own and the day averages them (heart rate, weight, temperature). NULL
+    -- where Apple's page states neither, which leaves `daily_metrics.day_value`
+    -- empty rather than guessing.
+    aggregation TEXT,
+    -- Apple's grouping of the identifiers: Activity, Nutrition, Vital signs.
+    family TEXT
+) WITHOUT ROWID;
 """
 
 
 @lru_cache(maxsize=1)
 def load() -> dict[str, Any]:
-    """The catalogue as generated, cached for the life of the process."""
+    """The category catalogue as generated, cached for the life of the process."""
     return json.loads(DATA_FILE.read_text())
+
+
+@lru_cache(maxsize=1)
+def load_quantities() -> dict[str, Any]:
+    """The quantity catalogue as generated, cached for the life of the process."""
+    return json.loads(QUANTITY_FILE.read_text())
 
 
 def install(connection: sqlite3.Connection) -> int:
@@ -73,6 +100,13 @@ def install(connection: sqlite3.Connection) -> int:
     """
     catalog = load()
     connection.executescript(SCHEMA)
+    connection.executemany(
+        "INSERT INTO quantity_types VALUES (?, ?, ?)",
+        [
+            (type_name, entry["aggregation"], entry["family"])
+            for type_name, entry in load_quantities()["types"].items()
+        ],
+    )
     connection.executemany(
         "INSERT INTO category_types VALUES (?, ?, ?, ?)",
         [

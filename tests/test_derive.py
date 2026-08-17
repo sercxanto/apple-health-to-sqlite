@@ -56,6 +56,49 @@ class DailyMetricsTest(unittest.TestCase):
         self.assertIn(("StepCount", "count"), units)
         self.assertIn(("BodyMass", "kg"), units)
 
+    def day_value(self, type_short: str) -> tuple:
+        return support.rows(
+            self.database,
+            "select aggregation, day_value, total, mean from daily_metrics "
+            "where type_short = ?",
+            (type_short,),
+        )[0]
+
+    def test_a_cumulative_metric_reads_its_day_as_the_sum(self):
+        """Steps add up: 1200 + 500 is the day's answer, their mean is not."""
+        aggregation, day_value, total, _ = self.day_value("StepCount")
+        self.assertEqual(aggregation, "cumulative")
+        self.assertEqual(day_value, 1700.0)
+        self.assertEqual(day_value, total)
+
+    def test_a_discrete_metric_reads_its_day_as_the_mean(self):
+        """60 bpm and 80 bpm make a day of 70 bpm, not one of 140."""
+        aggregation, day_value, total, mean = self.day_value("HeartRate")
+        self.assertEqual(aggregation, "discrete")
+        self.assertEqual(day_value, 70.0)
+        self.assertEqual(day_value, mean)
+        self.assertEqual(total, 140.0)
+
+    def test_an_unknown_metric_keeps_its_aggregates_and_picks_none(self):
+        """What every metric looks like between an iOS release and a catalogue
+        refresh: the numbers are all there, only the signpost is missing."""
+        aggregation, day_value, total, mean = self.day_value("InventedFutureMetric")
+        self.assertIsNone(aggregation)
+        self.assertIsNone(day_value)
+        self.assertEqual((total, mean), (7.0, 7.0))
+
+    def test_every_row_states_where_its_day_value_came_from(self):
+        """A `day_value` without its `aggregation` would be a number with no
+        way to tell whether it was summed or averaged."""
+        self.assertEqual(
+            support.one(
+                self.database,
+                "select count(*) from daily_metrics "
+                "where (day_value is null) != (aggregation is null)",
+            ),
+            0,
+        )
+
 
 class MetricSummaryTest(unittest.TestCase):
     @classmethod
@@ -195,6 +238,19 @@ class SyntheticDataViewTest(unittest.TestCase):
     def test_nightly_sleep_has_a_row_per_night(self):
         self.assertGreater(
             support.one(self.database, "select count(*) from nightly_sleep"), 5
+        )
+
+    def test_every_synthetic_metric_knows_how_its_day_adds_up(self):
+        """The synthesizer only emits identifiers Apple documents, so a metric
+        without an aggregation style here means the catalogue has gone stale,
+        not that Apple stayed silent."""
+        self.assertEqual(
+            support.rows(
+                self.database,
+                "select distinct type_short from daily_metrics "
+                "where aggregation is null",
+            ),
+            [],
         )
 
     def test_daily_metrics_index_exists(self):

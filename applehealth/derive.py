@@ -3,7 +3,8 @@
 Raw `records` is the wrong table to explore interactively: faceting five years
 of heart-rate samples in Datasette takes hundreds of milliseconds per click.
 `daily_metrics` pre-aggregates per metric and calendar day, which answers most
-questions in single-digit milliseconds.
+questions in single-digit milliseconds, and — via the catalogue — says which of
+its aggregates the metric actually means.
 
 The views exist because a few questions need SQL that is fiddly enough to be
 worth writing once: what a category record's value actually says, which sleep
@@ -105,17 +106,38 @@ WHERE local_date IS NOT NULL
 GROUP BY type, unit, source_name
 """
 
+# Every row here carries one number that answers the question and one that does
+# not: 6100 steps is a day's steps, while their mean (steps per sample) is
+# noise; 67 bpm is a day's heart rate, while their sum is nonsense. Which is
+# which depends on the metric, and the export never says — so `aggregation`
+# comes from the catalogue and `day_value` is the column it points at.
+#
+# `total` and `mean` both stay, unchanged: `day_value` is a signpost, not a
+# replacement, and a metric the catalogue has not heard of keeps them and
+# leaves `day_value` empty rather than picking wrong.
+#
+# One caveat `day_value` cannot fix: the grouping is per type, day and unit,
+# not per source. Where an iPhone and a Watch both record steps, both sets of
+# samples are in `records` and a cumulative `day_value` adds them up — a
+# higher number than the Health app shows. `metric_summary` is the table that
+# splits by source.
 DAILY_METRICS = """
 CREATE TABLE daily_metrics AS
-SELECT type_short, type, local_date, unit,
-       count(*)   AS n,
-       sum(value) AS total,
-       round(avg(value), 3) AS mean,
-       min(value) AS min_value,
-       max(value) AS max_value
-FROM records
-WHERE value IS NOT NULL AND local_date IS NOT NULL
-GROUP BY type, local_date, unit
+SELECT r.type_short, r.type, r.local_date, r.unit,
+       count(*)     AS n,
+       sum(r.value) AS total,
+       round(avg(r.value), 3) AS mean,
+       min(r.value) AS min_value,
+       max(r.value) AS max_value,
+       q.aggregation,
+       CASE q.aggregation
+            WHEN 'cumulative' THEN sum(r.value)
+            WHEN 'discrete'   THEN round(avg(r.value), 3)
+       END AS day_value
+FROM records r
+LEFT JOIN quantity_types q ON q.type = r.type
+WHERE r.value IS NOT NULL AND r.local_date IS NOT NULL
+GROUP BY r.type, r.local_date, r.unit
 """
 
 

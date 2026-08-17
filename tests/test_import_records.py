@@ -16,8 +16,8 @@ class RecordImportTest(unittest.TestCase):
         )
 
     def test_imports_every_record_including_the_nested_ones(self):
-        # Six top-level records plus the two inside the Correlation.
-        self.assertEqual(support.one(self.database, "select count(*) from records"), 8)
+        # Nine top-level records plus the two inside the Correlation.
+        self.assertEqual(support.one(self.database, "select count(*) from records"), 11)
 
     def test_numeric_values_land_in_value(self):
         value, text = support.rows(
@@ -112,7 +112,7 @@ class RecordImportTest(unittest.TestCase):
                 self.database,
                 "select count(*) from records where correlation_id is null",
             ),
-            6,
+            9,
         )
 
     def test_local_date_follows_the_wall_clock_not_utc(self):
