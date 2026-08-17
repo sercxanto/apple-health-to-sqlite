@@ -1,0 +1,190 @@
+{
+  // One task per `[tool.poe.tasks]` entry in pyproject.toml. The task list is
+  // the authority; this file only makes it reachable from the command palette
+  // (Terminal ▸ Run Task…), so anything added there belongs here too.
+  //
+  // Every task calls plain `poe` and finds it through the PATH below, rather
+  // than through the interpreter the Python extension has selected. That
+  // selection is the one thing that cannot be trusted here: the workspace is
+  // bind-mounted into the devcontainer, so a `.venv/` built on the host is
+  // visible inside the container and the extension happily picks it — an
+  // interpreter whose binaries are for the wrong operating system.
+  //
+  // The PATH says the same thing the other way round: the environment's own
+  // `poe` first (the devcontainer installs one, and so does a pipx or system
+  // install), the checkout's `.venv` only as a fallback for a plain local
+  // setup. Appending and not prepending is the whole trick — inside the
+  // container `.venv/bin/poe` exists and would be found first, and it would
+  // fail on its shebang.
+  "version": "2.0.0",
+  "options": {
+    "cwd": "${workspaceFolder}",
+    "env": {
+      "PATH": "${env:PATH}:${workspaceFolder}/.venv/bin"
+    }
+  },
+  "windows": {
+    "options": {
+      "env": {
+        "PATH": "${env:PATH};${workspaceFolder}\\.venv\\Scripts"
+      }
+    }
+  },
+  "presentation": {
+    "reveal": "always",
+    "panel": "dedicated",
+    "clear": true
+  },
+  "tasks": [
+    {
+      "label": "poe check",
+      "detail": "Lint and fast tests — what CI runs, and what \"done\" means",
+      "type": "shell",
+      "command": "poe",
+      "args": ["check"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      // ruff's diagnostics, so lint failures land in the Problems panel and
+      // not only in the terminal. Its default output puts the rule and the
+      // message on one line and the location on the next:
+      //
+      //     F401 [*] `os` imported but unused
+      //      --> applehealth/db.py:1:8
+      //
+      // Defined inline in each task because tasks.json has nowhere to name a
+      // matcher; only an extension can contribute one.
+      "problemMatcher": {
+        "owner": "ruff",
+        "source": "ruff",
+        "fileLocation": ["relative", "${workspaceFolder}"],
+        "severity": "error",
+        "pattern": [
+          {
+            "regexp": "^([A-Z]+\\d+)\\s+(?:\\[\\*\\]\\s+)?(.+)$",
+            "code": 1,
+            "message": 2
+          },
+          {
+            "regexp": "^\\s*-->\\s+(.+):(\\d+):(\\d+)$",
+            "file": 1,
+            "line": 2,
+            "column": 3
+          }
+        ]
+      }
+    },
+    {
+      "label": "poe test",
+      "detail": "Run the fast test suite",
+      "type": "shell",
+      "command": "poe",
+      "args": ["test"],
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "poe test-all",
+      "detail": "Run every test, including the slow large-export test",
+      "type": "shell",
+      "command": "poe",
+      "args": ["test-all"],
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "poe test-slow",
+      "detail": "Run only the slow large-export test",
+      "type": "shell",
+      "command": "poe",
+      "args": ["test-slow"],
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "poe lint",
+      "detail": "Check formatting and lint rules",
+      "type": "shell",
+      "command": "poe",
+      "args": ["lint"],
+      "problemMatcher": {
+        "owner": "ruff",
+        "source": "ruff",
+        "fileLocation": ["relative", "${workspaceFolder}"],
+        "severity": "error",
+        "pattern": [
+          {
+            "regexp": "^([A-Z]+\\d+)\\s+(?:\\[\\*\\]\\s+)?(.+)$",
+            "code": 1,
+            "message": 2
+          },
+          {
+            "regexp": "^\\s*-->\\s+(.+):(\\d+):(\\d+)$",
+            "file": 1,
+            "line": 2,
+            "column": 3
+          }
+        ]
+      }
+    },
+    {
+      "label": "poe format",
+      "detail": "Apply formatting and safe lint fixes",
+      "type": "shell",
+      "command": "poe",
+      "args": ["format"],
+      "problemMatcher": []
+    },
+    {
+      // Long-running: this one ends when you stop the server, so it keeps its
+      // own terminal and does not clear the output of the import that ran
+      // first. In the devcontainer, port 8001 is forwarded already.
+      "label": "poe demo",
+      "detail": "Synthesize an export, import it, and serve it",
+      "type": "shell",
+      "command": "poe",
+      "args": ["demo"],
+      "isBackground": true,
+      "presentation": {
+        "panel": "dedicated",
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "poe serve",
+      "detail": "Serve an already-built demo database",
+      "type": "shell",
+      "command": "poe",
+      "args": ["serve"],
+      "isBackground": true,
+      "presentation": {
+        "panel": "dedicated",
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      // Goes to the network and rewrites committed files — read the diff
+      // afterwards; it is Apple's documentation moving, not code.
+      "label": "poe refresh-catalog",
+      "detail": "Rebuild the category-value catalogue from Apple's documentation",
+      "type": "shell",
+      "command": "poe",
+      "args": ["refresh-catalog"],
+      "problemMatcher": []
+    },
+    {
+      "label": "poe clean",
+      "detail": "Remove build artefacts, caches and the demo directory",
+      "type": "shell",
+      "command": "poe",
+      "args": ["clean"],
+      "problemMatcher": []
+    }
+  ]
+}
