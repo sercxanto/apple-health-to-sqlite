@@ -140,11 +140,37 @@ class SyntheticWorkoutTest(unittest.TestCase):
     def setUpClass(cls):
         cls.database = support.sample_database()
 
-    def test_every_workout_has_a_distance(self):
+    def test_every_outdoor_workout_has_a_distance(self):
+        """Indoor workouts have none, which is Apple's shape rather than a gap;
+        anything that went out and recorded a route must have one."""
         self.assertEqual(
             support.one(
                 self.database,
-                "select count(*) from workouts where total_distance is null",
+                "select count(*) from workouts "
+                "where route_file is not null and total_distance is null",
+            ),
+            0,
+        )
+
+    def test_indoor_workouts_arrive_without_a_route_or_a_distance(self):
+        without_route, with_distance = support.rows(
+            self.database,
+            "select count(*), count(total_distance) from workouts "
+            "where activity_short = 'TraditionalStrengthTraining'",
+        )[0]
+        self.assertGreater(without_route, 0)
+        self.assertEqual(with_distance, 0)
+
+    def test_a_day_can_hold_an_indoor_workout_before_the_outdoor_one(self):
+        """The ordinary shape of a real day, and the one that breaks any query
+        reaching for "the" workout of a day — see tests/test_metadata_queries."""
+        self.assertGreater(
+            support.one(
+                self.database,
+                "select count(*) from workouts early join workouts late "
+                "on late.local_date = early.local_date "
+                "where early.route_file is null and late.route_file is not null "
+                "and early.start_ts < late.start_ts",
             ),
             0,
         )

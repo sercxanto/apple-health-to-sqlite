@@ -465,6 +465,60 @@ class Synthesizer:
             metadata={"HKWasUserEntered": "1"},
         )
 
+    def indoor_workout(self, day: date, index: int):
+        """A workout the watch records without a route: strength training in
+        the morning, on a day that also has an outdoor one in the evening.
+
+        Real weeks are full of these, and they are what makes "the workout on
+        that day" an ambiguous idea: anything that picks one workout per day
+        picks this one and misses the route. Indoor workouts also carry no
+        distance, which is Apple's shape rather than a gap in the data.
+        """
+        if index % 4:
+            return
+        start = self.at(day, 7.0 + self.random.uniform(-0.5, 0.5))
+        minutes = self.random.randint(20, 45)
+        end = start + timedelta(minutes=minutes)
+        energy = round(minutes * self.random.uniform(4.5, 8.0), 3)
+
+        inner = empty_tag("MetadataEntry", indent=2, key="HKIndoorWorkout", value="1")
+        inner += empty_tag(
+            "WorkoutStatistics",
+            indent=2,
+            type="HKQuantityTypeIdentifierActiveEnergyBurned",
+            startDate=format_timestamp(start),
+            endDate=format_timestamp(end),
+            sum=energy,
+            unit="kcal",
+        )
+        inner += empty_tag(
+            "WorkoutStatistics",
+            indent=2,
+            type="HKQuantityTypeIdentifierHeartRate",
+            startDate=format_timestamp(start),
+            endDate=format_timestamp(end),
+            average=round(self.around(124, 6), 4),
+            minimum=round(self.around(88, 5), 4),
+            maximum=round(self.around(152, 6), 4),
+            unit="count/min",
+        )
+        name, version, device = WATCH
+        yield wrapped_tag(
+            "Workout",
+            inner,
+            workoutActivityType="HKWorkoutActivityTypeTraditionalStrengthTraining",
+            duration=round(minutes, 4),
+            durationUnit="min",
+            totalEnergyBurned=energy,
+            totalEnergyBurnedUnit="kcal",
+            sourceName=name,
+            sourceVersion=version,
+            device=device,
+            creationDate=format_timestamp(end),
+            startDate=format_timestamp(start),
+            endDate=format_timestamp(end),
+        )
+
     def workout(self, day: date, index: int):
         """A workout with events, statistics and a GPS route.
 
@@ -753,6 +807,7 @@ class Synthesizer:
         yield from self.blood_pressure(day, index)
         yield from self.miscellaneous(day)
         yield from self.symptoms(day, index)
+        yield from self.indoor_workout(day, index)
         yield from self.workout(day, index)
         yield self.activity_summary(day)
 

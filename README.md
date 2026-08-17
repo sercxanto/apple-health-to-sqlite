@@ -41,7 +41,7 @@ others; both work, as does an unpacked directory or a bare XML file.
 
 The project can synthesize an export for you — same structure as the real
 thing, invented data: realistic steps, heart rate, sleep stages, workouts with
-GPS routes, the lot:
+GPS routes and indoor ones without, the lot:
 
 ```bash
 python3 -m applehealth synthesize --days 120 export.zip
@@ -231,10 +231,10 @@ configuration files in for you; put the database there yourself, or let
 
 The bundled [metadata.yml](applehealth/datasette/metadata.yml) adds facets and nine ready
 queries: steps per day, weight over time, resting heart rate against HRV, sleep
-per night, workouts, weekly totals, heart rate on one day, a workout route on a
-map, and an inventory of what your export actually contains. The database file
-must be named `health.db`, since Datasette keys the configuration on the
-filename.
+per night, workouts, weekly totals, heart rate on one day, the routes of one
+day on a map, and an inventory of what your export actually contains. The
+database file must be named `health.db`, since Datasette keys the configuration
+on the filename.
 
 ### Settings
 

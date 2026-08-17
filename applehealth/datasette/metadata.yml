@@ -171,14 +171,18 @@ databases:
           where type_short = 'HeartRate' and local_date = :day
           order by start_ts
 
+      # Every point recorded that day, rather than the day's first workout:
+      # picking the first one drew an empty map whenever something without a
+      # route came earlier — an indoor session in the morning before the run is
+      # an ordinary day. A day with two outdoor workouts now shows both tracks,
+      # told apart by the activity and workout_start columns.
       route_of_a_workout:
-        title: Route of a workout (map)
+        title: Routes on one day (map)
         sql: |-
-          select p.seq, p.latitude, p.longitude, p.elevation,
+          select w.activity_short as activity, w.start_local as workout_start,
+                 p.seq, p.latitude, p.longitude, p.elevation,
                  round(p.speed * 3.6, 1) as kmh, p.time
           from workout_points p
-          where p.workout_id = (
-            select id from workouts
-            where local_date = :day
-            order by start_ts limit 1)
-          order by p.seq
+          join workouts w on w.id = p.workout_id
+          where w.local_date = :day
+          order by w.start_ts, p.seq

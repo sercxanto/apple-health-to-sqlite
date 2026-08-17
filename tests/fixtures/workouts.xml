@@ -30,13 +30,17 @@
 </Workout>
 
 <!-- Attributes populated instead. Both forms are declared in version 14 and
-     both occur in the wild, so both have to work. -->
+     both occur in the wild, so both have to work.
+
+     Deliberately on the same day as the run above and earlier than it, and
+     without a route: that is what an ordinary day looks like, and anything
+     that reaches for "the workout of that day" gets the wrong one. -->
 <Workout workoutActivityType="HKWorkoutActivityTypeCycling"
          duration="30" durationUnit="min"
          totalDistance="12.25" totalDistanceUnit="km"
          totalEnergyBurned="310.5" totalEnergyBurnedUnit="kcal"
          sourceName="Apple Watch" sourceVersion="9.0"
-         startDate="2026-08-02 18:00:00 +0200" endDate="2026-08-02 18:30:00 +0200"/>
+         startDate="2026-08-01 07:00:00 +0200" endDate="2026-08-01 07:30:00 +0200"/>
 
 <!-- Multi-sport. Deliberately beyond what the version 14 DTD declares: it
      defines WorkoutActivity but no content model references it, and it does not

@@ -80,6 +80,20 @@ removes it.
   message you would have used — English, subject line plus body, why rather
   than what — as text in your reply for the user to paste. Not into a file, not
   through `git commit -F`.
+* **Sign the message as the agent you are.** End every commit message you hand
+  over with a co-author trailer, in its own paragraph, last:
+
+      Co-Authored-By: <your model or tool name> <your vendor's noreply address>
+
+  Fill that in with what you actually are, not with a name copied out of this
+  file or off an earlier commit — a different agent next month must leave a
+  different trailer. `git log` shows the form the ones before you used.
+  `Signed-off-by:` is not yours to add: it certifies the right to contribute,
+  which is the user's to certify.
+
+  The history should show where the code came from; someone reading a commit
+  years from now deserves to know which machine wrote it and that a person
+  reviewed it, rather than having to guess.
 * **Read-only git is fine**, and often the right thing: `status`, `diff`, `log`,
   `show`.
 

@@ -28,6 +28,7 @@ CONFIG_DIRECTORY = demo.config_dir()
 METADATA = CONFIG_DIRECTORY / "metadata.yml"
 SETTINGS = CONFIG_DIRECTORY / "settings.json"
 DATASETTE = shutil.which("datasette")
+ROUTE_POINTS = [(48.10, 11.50), (48.11, 11.51), (48.12, 11.52)]
 
 
 def load_queries(database: Path) -> list[dict]:
@@ -123,18 +124,51 @@ class MetadataQueryTest(unittest.TestCase):
         self.assertGreater(len(payload), 0)
         self.assertIn("steps", payload[0])
 
+    def route_query(self) -> str:
+        return next(q for q in self.queries if q["name"] == "route_of_a_workout")["sql"]
+
     def test_map_query_returns_coordinates(self):
-        """datasette-cluster-map keys off columns named latitude/longitude."""
+        """datasette-cluster-map keys off columns named latitude/longitude.
+
+        Asked for every day that has a route, not for one of them: the days
+        that go wrong are the ones whose first workout is the indoor one.
+        """
         connection = sqlite3.connect(self.database)
         try:
-            day = connection.execute(
-                "select local_date from workouts where n_points > 0 limit 1"
-            ).fetchone()[0]
-            query = next(q for q in self.queries if q["name"] == "route_of_a_workout")
-            rows = connection.execute(query["sql"], {"day": day}).fetchall()
+            days = [
+                day
+                for (day,) in connection.execute(
+                    "select distinct local_date from workouts where n_points > 0"
+                )
+            ]
+            self.assertGreater(len(days), 0)
+            for day in days:
+                with self.subTest(day=day):
+                    cursor = connection.execute(self.route_query(), {"day": day})
+                    columns = [column[0] for column in cursor.description]
+                    self.assertGreater(len(cursor.fetchall()), 0)
+                    self.assertIn("latitude", columns)
+                    self.assertIn("longitude", columns)
         finally:
             connection.close()
-        self.assertGreater(len(rows), 0)
+
+    def test_map_query_finds_a_route_behind_an_earlier_routeless_workout(self):
+        """The shape that made this query look broken: an indoor workout in the
+        morning, the run with the GPS track in the evening. Asking for the
+        day's *first* workout shows an empty map for a day that has a route."""
+        database, _ = support.import_export(
+            support.export_from_fixture(
+                "workouts", routes={"route_a.gpx": support.gpx(ROUTE_POINTS)}
+            )
+        )
+        connection = sqlite3.connect(database)
+        try:
+            rows = connection.execute(
+                self.route_query(), {"day": "2026-08-01"}
+            ).fetchall()
+        finally:
+            connection.close()
+        self.assertEqual(len(rows), len(ROUTE_POINTS))
 
 
 @unittest.skipIf(DATASETTE is None, "datasette is not installed")
