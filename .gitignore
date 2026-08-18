@@ -14,3 +14,5 @@ build/
 dist/
 .venv/
 .ruff_cache/
+htmlcov/
+.coverage

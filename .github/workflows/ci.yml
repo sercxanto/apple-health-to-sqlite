@@ -26,6 +26,30 @@ jobs:
       - name: Test
         run: poe test
 
+  coverage:
+    # The gate is `fail_under` in pyproject.toml, so this job enforces exactly
+    # the number `poe coverage` enforces locally — CI holds no threshold of its
+    # own. One Python version is enough: what is measured is the reach of the
+    # tests over the code, not anything the interpreter varies.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: Coverage
+        run: poe coverage
+      - name: Upload HTML report
+        # Also when the step above failed: a tripped gate is exactly when you
+        # want the line-by-line report.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: htmlcov/
+
   slow:
     # The large-export test takes a few minutes; run it once, not per version.
     runs-on: ubuntu-latest

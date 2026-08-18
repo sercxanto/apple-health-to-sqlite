@@ -24,6 +24,7 @@ dependencies = []
 
 [project.optional-dependencies]
 dev = [
+    "coverage>=7",
     "datasette>=0.65,<1",
     "datasette-cluster-map",
     "datasette-vega",
@@ -71,6 +72,10 @@ help = "Run only the slow large-export test"
 script = "tasks:test_slow"
 env = { APPLEHEALTH_SLOW_TESTS = "1" }
 
+[tool.poe.tasks.coverage]
+help = "Measure test coverage and enforce the gate (terminal + htmlcov/)"
+script = "tasks:coverage"
+
 [tool.poe.tasks.lint]
 help = "Check formatting and lint rules"
 sequence = [
@@ -117,3 +122,26 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["E501"]
+
+# Coverage measures the package only: `applehealth/`, not the tests that
+# exercise it, nor `tasks.py`/`tools/` which are development scaffolding. Branch
+# coverage is on because a lot of the interesting untested paths here are
+# `else` arms — a fallback that never fired in a test looks covered by line
+# count alone. `poe coverage` writes both a terminal summary and htmlcov/.
+[tool.coverage.run]
+source = ["applehealth"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+# The gate, enforced by `poe coverage` and so by the `coverage` CI job that
+# runs it. 82% is where the suite stood when this was added, rounded down to
+# the point: a ratchet against regression rather than a target to chase, and
+# worth raising once the real number has moved up and stayed there. Almost all
+# of what is missing is `cli.py`, which no test drives yet. It stays in the
+# measurement instead of being omitted, because a gap you can see is a gap
+# someone can close.
+fail_under = 82
+
+[tool.coverage.html]
+directory = "htmlcov"

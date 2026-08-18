@@ -48,6 +48,7 @@ below with its description.
 | `poe test` | fast test suite (a few seconds) |
 | `poe test-all` | everything, including the slow large-export test |
 | `poe test-slow` | only the slow large-export test — what the `slow` CI job runs |
+| `poe coverage` | fast suite under coverage; terminal summary + `htmlcov/`, fails under the gate |
 | `poe lint` | `ruff check` and `ruff format --check` |
 | `poe format` | apply formatting and safe fixes |
 | `poe check` | lint + fast tests — what CI runs |
@@ -78,6 +79,14 @@ Run a single test file or case with unittest directly:
 python3 -m unittest tests.test_import_workouts -v
 python3 -m unittest tests.test_derive.SleepViewTest.test_a_night_spans_midnight
 ```
+
+`poe coverage` measures `applehealth/` only, with branch coverage on, and fails
+if the total drops below the `fail_under` in pyproject.toml — the `coverage` CI
+job is that same command, so the threshold lives in one place and moves in one
+place. It runs the fast suite on purpose: measured both ways, the slow test
+reaches no line the small fixtures do not, and excluding it means code that
+only the large-export path reaches is reported as uncovered rather than
+quietly counted.
 
 The slow test (`tests/test_large_export.py`) is skipped unless
 `APPLEHEALTH_SLOW_TESTS=1` is set. It synthesizes a few hundred thousand records
