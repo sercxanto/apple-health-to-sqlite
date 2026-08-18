@@ -8,11 +8,59 @@ from __future__ import annotations
 
 import argparse
 import sys
+import textwrap
 from pathlib import Path
 
 from . import __version__, demo, dtd, pipeline, schema_tools, synthetic
 from .archive import ExportNotFound
 from .importer import ImportOptions
+
+
+def _wrapped(text: str, width: int = 76) -> str:
+    """Wrap every paragraph of `text`, keeping the blank lines between them.
+
+    argparse offers a formatter that reflows to the terminal width but
+    collapses the paragraphs into one while doing it, and a raw one that keeps
+    the paragraphs and wraps nothing. The descriptions below want both, so
+    they are wrapped here and handed to the raw formatter.
+    """
+    return "\n\n".join(
+        textwrap.fill(paragraph, width) for paragraph in text.split("\n\n")
+    )
+
+
+DEMO_DESCRIPTION = _wrapped(
+    f"""\
+Build a demonstration out of invented data, and serve it.
+
+Creates DIRECTORY, synthesizes an export into it, imports that into
+DIRECTORY/{demo.DATABASE_NAME}, and serves the directory exactly as 'serve'
+does. No health data of yours is involved at any point.
+
+Everything under DIRECTORY is rebuildable output; 'poe clean' deletes it.\
+"""
+)
+
+SERVE_DESCRIPTION = _wrapped(
+    f"""\
+Serve a database that has already been built.
+
+Datasette is configured through a directory rather than through flags, so
+this assembles one: it copies the bundled configuration
+({" and ".join(demo.CONFIG_FILES)}) into DIRECTORY, overwriting whatever
+copies are already there, and then runs Datasette on the directory in the
+foreground until Ctrl-C. Edits of your own to those files do not survive a
+restart; make them in applehealth/datasette/, where the copies come from.
+
+The database has to be DIRECTORY/{demo.DATABASE_NAME}, under exactly that
+name: Datasette keys the canned queries in metadata.yml on the filename.
+Build one with 'demo', or import an export to that path yourself.
+
+Datasette is a development dependency and is never imported by this package;
+it runs as a subprocess, whether it lives in this environment (pip) or in one
+of its own (pipx).\
+"""
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -90,19 +138,29 @@ def build_parser() -> argparse.ArgumentParser:
     compare.add_argument("export")
 
     demonstrate = commands.add_parser(
-        "demo", help="synthesize an export, import it, and serve it"
+        "demo",
+        help="synthesize an export, import it, and serve it",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=DEMO_DESCRIPTION,
     )
     demonstrate.add_argument(
         "directory", nargs="?", default=demo.DEFAULT_DIRECTORY, help="where to build it"
     )
-    demonstrate.add_argument("--days", type=int, default=120)
-    demonstrate.add_argument("--port", type=int, default=demo.DEFAULT_PORT)
+    demonstrate.add_argument(
+        "--days", type=int, default=120, help="how many days to invent"
+    )
+    demonstrate.add_argument(
+        "--port", type=int, default=demo.DEFAULT_PORT, help="port to serve on"
+    )
     demonstrate.add_argument(
         "--no-serve", action="store_true", help="build the database but do not serve it"
     )
 
     server = commands.add_parser(
-        "serve", help="serve an already-built database with Datasette"
+        "serve",
+        help="serve an already-built database with Datasette",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=SERVE_DESCRIPTION,
     )
     server.add_argument(
         "directory",
@@ -110,7 +168,9 @@ def build_parser() -> argparse.ArgumentParser:
         default=demo.DEFAULT_DIRECTORY,
         help=f"directory holding {demo.DATABASE_NAME}",
     )
-    server.add_argument("--port", type=int, default=demo.DEFAULT_PORT)
+    server.add_argument(
+        "--port", type=int, default=demo.DEFAULT_PORT, help="port to serve on"
+    )
 
     return parser
 

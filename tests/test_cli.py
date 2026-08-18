@@ -5,6 +5,7 @@ from __future__ import annotations
 import subprocess
 import sys
 import unittest
+from unittest import mock
 
 from applehealth import demo
 
@@ -167,6 +168,49 @@ class DemoCommandTest(unittest.TestCase):
         missing = support.workspace("demo") / "typo"
         run("serve", str(missing))
         self.assertFalse(missing.exists())
+
+
+class DatasetteDiscoveryTest(unittest.TestCase):
+    """Both installations CONTRIBUTING.md offers have to be found.
+
+    pip puts Datasette in this environment, where it is importable; pipx puts
+    it in one of its own, where only the script on the PATH exists. Looking
+    for the module alone told everyone on the pipx route that Datasette was
+    not installed, in the same shell where `datasette` ran fine.
+    """
+
+    def test_an_importable_datasette_runs_in_this_interpreter(self):
+        with mock.patch.object(demo, "find_spec", return_value=object()):
+            self.assertEqual(
+                demo.datasette_command(), [sys.executable, "-m", "datasette"]
+            )
+
+    def test_a_pipx_datasette_is_found_on_the_path(self):
+        with (
+            mock.patch.object(demo, "find_spec", return_value=None),
+            mock.patch.object(demo.shutil, "which", return_value="/pipx/bin/datasette"),
+        ):
+            self.assertEqual(demo.datasette_command(), ["/pipx/bin/datasette"])
+
+    def test_neither_is_an_error_naming_both_ways_to_install(self):
+        with (
+            mock.patch.object(demo, "find_spec", return_value=None),
+            mock.patch.object(demo.shutil, "which", return_value=None),
+            self.assertRaises(demo.DatasetteMissing) as raised,
+        ):
+            demo.datasette_command()
+        self.assertIn("pip install datasette", str(raised.exception))
+        self.assertIn("pipx install datasette", str(raised.exception))
+
+
+class HelpTest(unittest.TestCase):
+    def test_serve_says_that_it_copies_the_configuration(self):
+        """The copying is the part of `serve` nobody expects."""
+        result = run("serve", "--help")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for name in demo.CONFIG_FILES:
+            self.assertIn(name, result.stdout)
+        self.assertIn(demo.DATABASE_NAME, result.stdout)
 
 
 class ConfigurationTest(unittest.TestCase):
