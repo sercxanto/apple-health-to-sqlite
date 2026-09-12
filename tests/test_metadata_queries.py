@@ -13,6 +13,7 @@ checkout.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import sqlite3
 import subprocess
@@ -29,6 +30,12 @@ METADATA = CONFIG_DIRECTORY / "metadata.yml"
 SETTINGS = CONFIG_DIRECTORY / "settings.json"
 DATASETTE = shutil.which("datasette")
 ROUTE_POINTS = [(48.10, 11.50), (48.11, 11.51), (48.12, 11.52)]
+
+# Queries whose empty result is the right answer rather than a broken query.
+# days_without_data reports gaps in the history and the synthesizer writes every
+# day, so nothing is a correct answer here; test_days_without_data_finds_a_gap
+# makes a gap and checks it there instead.
+MAY_BE_EMPTY = {"days_without_data"}
 
 
 def load_queries(database: Path) -> list[dict]:
@@ -59,10 +66,28 @@ class MetadataQueryTest(unittest.TestCase):
         cls.database = support.workspace("datasette") / "health.db"
         shutil.copy(source, cls.database)
         cls.queries = load_queries(cls.database)
-        cls.day = support.one(
-            cls.database,
-            "select local_date from records where type_short = 'HeartRate' limit 1",
-        )
+        cls.values = {
+            "day": support.one(
+                cls.database,
+                "select local_date from records where type_short = 'HeartRate' limit 1",
+            ),
+            "metric": "StepCount",
+        }
+
+    @classmethod
+    def bindings(cls, sql: str) -> dict[str, str]:
+        """The sample values a query needs, keyed by the parameters it names.
+
+        Datasette turns `:day` into an input field; the tests have to fill the
+        same fields in. Deriving them from the SQL keeps a query that names a
+        new parameter from quietly slipping past the checks below.
+        """
+        return {name: value for name, value in cls.values.items() if f":{name}" in sql}
+
+    @classmethod
+    def query(cls, name: str) -> str:
+        """The SQL Datasette reports for one canned query, by name."""
+        return next(q["sql"] for q in cls.queries if q["name"] == name)
 
     def test_datasette_loads_the_metadata(self):
         self.assertGreater(len(self.queries), 5)
@@ -72,8 +97,9 @@ class MetadataQueryTest(unittest.TestCase):
         try:
             for query in self.queries:
                 with self.subTest(query=query["name"]):
-                    parameters = {"day": self.day} if ":day" in query["sql"] else {}
-                    connection.execute(query["sql"], parameters).fetchall()
+                    connection.execute(
+                        query["sql"], self.bindings(query["sql"])
+                    ).fetchall()
         finally:
             connection.close()
 
@@ -81,7 +107,7 @@ class MetadataQueryTest(unittest.TestCase):
         connection = sqlite3.connect(self.database)
         try:
             for query in self.queries:
-                if ":day" in query["sql"]:
+                if self.bindings(query["sql"]) or query["name"] in MAY_BE_EMPTY:
                     continue
                 with self.subTest(query=query["name"]):
                     rows = connection.execute(query["sql"]).fetchall()
@@ -95,15 +121,48 @@ class MetadataQueryTest(unittest.TestCase):
         connection = sqlite3.connect(self.database)
         try:
             for query in self.queries:
-                if ":day" not in query["sql"]:
+                parameters = self.bindings(query["sql"])
+                if not parameters or query["name"] in MAY_BE_EMPTY:
                     continue
                 with self.subTest(query=query["name"]):
-                    rows = connection.execute(
-                        query["sql"], {"day": self.day}
-                    ).fetchall()
+                    rows = connection.execute(query["sql"], parameters).fetchall()
                     self.assertGreater(len(rows), 0)
         finally:
             connection.close()
+
+    def test_days_without_data_finds_a_gap(self):
+        """A day with no samples and a day with a zero look the same in a chart,
+        so the query has to name the missing one. The synthesizer writes every
+        day; the gap is made here.
+        """
+        database = support.workspace("gap") / "health.db"
+        shutil.copy(self.database, database)
+        connection = sqlite3.connect(database)
+        try:
+            skipped = support.one(
+                database,
+                "select local_date from daily_metrics where type_short = 'StepCount' "
+                "order by local_date limit 1 offset 3",
+            )
+            connection.execute(
+                "delete from daily_metrics "
+                "where type_short = 'StepCount' and local_date = ?",
+                (skipped,),
+            )
+            rows = connection.execute(
+                self.query("days_without_data"), {"metric": "StepCount"}
+            ).fetchall()
+            self.assertEqual([row[0] for row in rows], [skipped])
+        finally:
+            connection.close()
+
+    def test_every_parameter_a_query_uses_has_a_sample_value(self):
+        """A query naming a parameter this test does not know would otherwise
+        be silently skipped rather than checked."""
+        for query in self.queries:
+            with self.subTest(query=query["name"]):
+                named = set(re.findall(r":([a-z_]+)", query["sql"]))
+                self.assertLessEqual(named, set(self.values))
 
     def test_serving_a_query_over_http_works(self):
         """One end-to-end check that the whole path really is wired up."""

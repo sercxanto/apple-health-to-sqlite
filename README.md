@@ -229,12 +229,22 @@ has to be repeated on the command line. The command copies the two
 configuration files in for you; put the database there yourself, or let
 `python3 -m applehealth demo` build the whole directory from synthetic data.
 
-The bundled [metadata.yml](applehealth/datasette/metadata.yml) adds facets and nine ready
-queries: steps per day, weight over time, resting heart rate against HRV, sleep
-per night, workouts, weekly totals, heart rate on one day, the routes of one
-day on a map, and an inventory of what your export actually contains. The
-database file must be named `health.db`, since Datasette keys the configuration
-on the filename.
+The bundled [metadata.yml](applehealth/datasette/metadata.yml) adds facets and
+nineteen ready queries, in four groups:
+
+* **Day to day** — steps per day, steps with 7- and 28-day averages, steps by
+  weekday, weekly totals, weight over time, resting heart rate against HRV, and
+  heart rate on one day.
+* **Sleep** — sleep per night, bedtime and wake time with sleep efficiency, and
+  sleep against the next day's resting heart rate and HRV.
+* **Activity** — workouts, moving time against elapsed time, the activity rings
+  with how many of them closed, and the routes of one day on a map.
+* **What is in the export** — an inventory of the metrics, which source
+  recorded what and when, the days a metric has no data at all, the symptom
+  diary, and whether the import got everything.
+
+The database file must be named `health.db`, since Datasette keys the
+configuration on the filename.
 
 ### Settings
 

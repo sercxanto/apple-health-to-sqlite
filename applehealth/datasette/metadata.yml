@@ -205,3 +205,181 @@ databases:
           join workouts w on w.id = p.workout_id
           where w.local_date = :day
           order by w.start_ts, p.seq
+
+      # A day of steps is noise; the trend is the signal. Window functions over
+      # daily_metrics rather than a self-join, so this stays a scan of one
+      # indexed table.
+      steps_trend:
+        title: Steps with 7- and 28-day averages
+        sql: |-
+          select local_date,
+                 cast(coalesce(deduplicated_value, day_value) as integer) as steps,
+                 cast(avg(coalesce(deduplicated_value, day_value)) over
+                      (order by local_date rows between 6 preceding and current row)
+                      as integer) as avg_7d,
+                 cast(avg(coalesce(deduplicated_value, day_value)) over
+                      (order by local_date rows between 27 preceding and current row)
+                      as integer) as avg_28d
+          from daily_metrics
+          where type_short = 'StepCount'
+          order by local_date desc
+          limit 400
+
+      weekday_profile:
+        title: Steps by weekday
+        sql: |-
+          select case cast(strftime('%w', local_date) as integer)
+                   when 0 then '7 Sunday' when 1 then '1 Monday'
+                   when 2 then '2 Tuesday' when 3 then '3 Wednesday'
+                   when 4 then '4 Thursday' when 5 then '5 Friday'
+                   else '6 Saturday' end as weekday,
+                 count(*) as days,
+                 cast(avg(coalesce(deduplicated_value, day_value)) as integer) as avg_steps,
+                 cast(min(coalesce(deduplicated_value, day_value)) as integer) as min_steps,
+                 cast(max(coalesce(deduplicated_value, day_value)) as integer) as max_steps
+          from daily_metrics
+          where type_short = 'StepCount'
+          group by weekday
+          order by weekday
+
+      # A missing day and a zero day look identical in a chart and mean opposite
+      # things — the watch was off the wrist, or the day really was still. Only
+      # a calendar can tell them apart, so this generates one and subtracts.
+      # :metric takes a type_short, e.g. StepCount.
+      days_without_data:
+        title: Days with no data for a metric
+        sql: |-
+          with recursive
+            span as (select min(local_date) as a, max(local_date) as b
+                     from daily_metrics where type_short = :metric),
+            calendar(day) as (select a from span
+                              union all
+                              select date(day, '+1 day') from calendar, span
+                              where day < b)
+          select day as missing_day,
+                 cast(strftime('%w', day) as integer) as weekday
+          from calendar
+          where day not in (select local_date from daily_metrics
+                            where type_short = :metric)
+          order by day desc
+
+      # Which device covered which stretch of the history — the answer to most
+      # "why does the curve jump here" questions. Reads metric_summary for the
+      # same reason what_is_in_my_export does: asking records directly is a full
+      # scan. That table knows sourceName but not the device string, which is
+      # the coarser and more readable of the two anyway.
+      sources_over_time:
+        title: Which source recorded what, and when
+        sql: |-
+          select source_name,
+                 min(first_seen) as first_day, max(last_seen) as last_day,
+                 count(distinct type_short) as metrics,
+                 sum(samples) as samples
+          from metric_summary
+          group by source_name
+          order by first_day
+
+      # activity_summaries carries the goal beside the value, which no other
+      # table does — so "did I close it" is answerable here and nowhere else.
+      # Summing the three comparisons gives the ring count the watch shows.
+      activity_rings:
+        title: Activity rings and how many closed
+        sql: |-
+          select date_components as day,
+                 round(active_energy_burned) as move_kcal,
+                 round(active_energy_burned_goal) as move_goal,
+                 apple_exercise_time as exercise_min,
+                 apple_exercise_time_goal as exercise_goal,
+                 apple_stand_hours as stand_h,
+                 apple_stand_hours_goal as stand_goal,
+                 (active_energy_burned >= active_energy_burned_goal)
+               + (apple_exercise_time >= apple_exercise_time_goal)
+               + (apple_stand_hours >= apple_stand_hours_goal) as rings_closed
+          from activity_summaries
+          order by day desc
+          limit 400
+
+      # workout_summary.minutes is the wall clock, pauses included, so a walk
+      # with traffic lights reads slower than it was. Pairing each Pause with
+      # the event that follows it gives the moving time beside it; a workout
+      # without pauses has the two columns equal, which is the point.
+      workout_moving_time:
+        title: Workouts, moving time against elapsed time
+        sql: |-
+          with pauses as (
+            select workout_id, type_short, ts as paused_at,
+                   lead(ts) over (partition by workout_id order by seq) as resumed_at
+            from workout_events)
+          select w.local_date, w.activity_short as activity, w.start_local,
+                 round(w.duration_s / 60.0, 1) as elapsed_min,
+                 round((w.duration_s - coalesce(
+                        (select sum(p.resumed_at - p.paused_at) from pauses p
+                          where p.workout_id = w.id and p.type_short = 'Pause'
+                            and p.resumed_at is not null), 0)) / 60.0, 1) as moving_min,
+                 (select count(*) from workout_events e
+                   where e.workout_id = w.id and e.type_short = 'Pause') as pauses,
+                 w.total_distance as distance, w.total_distance_unit as distance_unit
+          from workouts w
+          order by w.start_ts desc
+          limit 200
+
+      # nightly_sleep answers how much; this answers when, which is the half
+      # that shows a drifting rhythm. The span from the first segment to the
+      # last stands in for time in bed, because InBed is only recorded by some
+      # sources and a watch-only night has none.
+      sleep_timing:
+        title: Bedtime, wake time and sleep efficiency
+        sql: |-
+          select night_date,
+                 time(min(start_local)) as to_bed,
+                 time(max(end_local)) as got_up,
+                 time(julianday(min(start_local))
+                      + (julianday(max(end_local)) - julianday(min(start_local))) / 2)
+                      as midpoint,
+                 round(sum(case when stage like 'Asleep%' then minutes end) / 60.0, 2)
+                      as hours_asleep,
+                 round(24 * (julianday(max(end_local)) - julianday(min(start_local))), 2)
+                      as hours_in_bed,
+                 cast(round(100.0 * sum(case when stage like 'Asleep%' then minutes end)
+                      / (1440.0 * (julianday(max(end_local)) - julianday(min(start_local)))))
+                      as integer) as efficiency_pct
+          from sleep_segments
+          group by night_date
+          order by night_date desc
+          limit 200
+
+      # The night is dated by the evening it started, so the morning after is
+      # night_date + 1 — the resting heart rate and HRV measured then are the
+      # ones a short night shows up in.
+      sleep_and_next_day:
+        title: Sleep against the next day's resting HR and HRV
+        sql: |-
+          select s.night_date, s.hours_asleep, s.min_deep, s.min_rem, s.min_awake,
+                 round(hr.mean, 1) as next_day_resting_hr,
+                 round(hrv.mean, 1) as next_day_hrv
+          from nightly_sleep s
+          left join daily_metrics hr
+            on hr.type_short = 'RestingHeartRate'
+           and hr.local_date = date(s.night_date, '+1 day')
+          left join daily_metrics hrv
+            on hrv.type_short = 'HeartRateVariabilitySDNN'
+           and hrv.local_date = date(s.night_date, '+1 day')
+          order by s.night_date desc
+          limit 200
+
+      # unhandled is a feature, and nothing surfaced it until now. One row
+      # rather than a listing of that table on purpose: the interesting state is
+      # "still zero", and a query that returns nothing reads as a broken query.
+      # Every count here is a lookup over a small table, so it stays instant on
+      # a five-year database.
+      import_overview:
+        title: Did the import get everything?
+        sql: |-
+          select (select count(*) from unhandled) as unhandled_elements,
+                 (select sum(samples) from metric_summary) as samples,
+                 (select count(distinct type_short) from metric_summary) as metrics,
+                 (select min(first_seen) from metric_summary) as first_day,
+                 (select max(last_seen) from metric_summary) as last_day,
+                 (select count(*) from workouts) as workouts,
+                 (select count(*) from workouts where n_points = 0)
+                      as workouts_without_route
