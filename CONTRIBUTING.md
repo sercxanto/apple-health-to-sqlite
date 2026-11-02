@@ -177,7 +177,7 @@ at it. Then:
    cover that with a fixture instead, as `WorkoutActivity` does.
 5. **Test it.** A focused fixture in `tests/fixtures/` for the edge cases, and
    assertions on the synthetic data for the normal path.
-6. **Document it** in the database layout table in README.md.
+6. **Document it** in the database layout table in docs/database.md.
 
 ### Refreshing the bundled schema
 

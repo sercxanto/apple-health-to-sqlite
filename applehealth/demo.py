@@ -3,8 +3,8 @@
 Datasette is configured through a *directory*, not through flags: point it at a
 folder holding `metadata.yml`, `settings.json` and the database, and it picks
 up all three. So serving means building that folder first — copying the two
-configuration files out of the package next to the database. See README,
-"Datasette".
+configuration files out of the package next to the database. See
+docs/datasette.md.
 
 This used to be `mkdir -p`, `cp` and a `datasette` invocation in the Makefile,
 which is three things a Windows machine does not have. Doing it in Python means

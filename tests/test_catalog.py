@@ -97,7 +97,7 @@ class QuantityCatalogDataTest(unittest.TestCase):
         self.assertGreater(styles.count("discrete"), 20)
 
     def test_the_metrics_the_docs_lean_on_read_the_way_they_read(self):
-        """Steps add up, heart rate does not. README and `derive` both say so."""
+        """Steps add up, heart rate does not. docs/database.md and `derive` both say so."""
         self.assertEqual(
             self.types["HKQuantityTypeIdentifierStepCount"]["aggregation"], "cumulative"
         )
