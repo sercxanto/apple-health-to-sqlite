@@ -8,8 +8,8 @@ python3 -m apple_health_to_sqlite schema-diff EXPORT
 ```
 
 That form works in a checkout with nothing installed. Outside one,
-`uvx --from apple-health-to-sqlite health2sqlite <command>` runs the same
-commands; after `uv tool install apple-health-to-sqlite` they are available as
+`uvx apple-health-to-sqlite <command>` runs the same commands; after
+`uv tool install apple-health-to-sqlite` they are available as
 `health2sqlite <command>`. Every command has `--help`.
 
 ## import

@@ -8,7 +8,7 @@ with [Datasette](https://datasette.io), browse it as a website on your own
 machine.
 
 ```bash
-uvx --from apple-health-to-sqlite health2sqlite import Export.zip mine/
+uvx apple-health-to-sqlite import Export.zip mine/
 ```
 
 That is the whole setup, given [uv](https://docs.astral.sh/uv/). The tool has no
@@ -43,8 +43,8 @@ The project can invent a realistic export — steps, heart rate, sleep stages,
 workouts with routes — so you can look around before touching your own:
 
 ```bash
-uvx --from apple-health-to-sqlite health2sqlite synthesize --days 120 export.zip
-uvx --from apple-health-to-sqlite health2sqlite import export.zip sample/
+uvx apple-health-to-sqlite synthesize --days 120 export.zip
+uvx apple-health-to-sqlite import export.zip sample/
 uvx "datasette<1" sample/
 ```
 
@@ -57,7 +57,7 @@ Then open <http://localhost:8001>.
 2. Import it and open it:
 
    ```bash
-   uvx --from apple-health-to-sqlite health2sqlite import Export.zip mine/
+   uvx apple-health-to-sqlite import Export.zip mine/
    uvx "datasette<1" mine/
    ```
 
@@ -91,8 +91,8 @@ health2sqlite import Export.zip mine/
 
 Everything runs locally; nothing is uploaded anywhere. Please keep it that
 way: **do not `datasette publish` this database**, and never attach your
-export or database to an issue — `health2sqlite schema-diff Export.zip` prints
-only the structure of your export and is safe to share.
+export or database to an issue — `uvx apple-health-to-sqlite schema-diff
+Export.zip` prints only the structure of your export and is safe to share.
 
 ## Documentation
 

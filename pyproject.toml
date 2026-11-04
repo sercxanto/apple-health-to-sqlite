@@ -30,8 +30,12 @@ dependencies = []
 Homepage = "https://github.com/sercxanto/apple-health-to-sqlite"
 Issues = "https://github.com/sercxanto/apple-health-to-sqlite/issues"
 
+# Two names for one command. health2sqlite is the one to type. The second exists
+# for uvx, which looks for a command named like the package, so that
+# `uvx apple-health-to-sqlite import ...` works without `--from`.
 [project.scripts]
 health2sqlite = "apple_health_to_sqlite.cli:main"
+apple-health-to-sqlite = "apple_health_to_sqlite.cli:main"
 
 # A group rather than an extra: `uv run` and `uv sync` install it by default,
 # so `uv run poe check` works in a fresh clone, and it stays out of the metadata

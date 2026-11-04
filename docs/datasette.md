@@ -7,7 +7,7 @@ install it instead, use `uv tool install "datasette<1"`, and then call plain
 `datasette`.
 
 ```bash
-uvx --from apple-health-to-sqlite health2sqlite import Export.zip mine/
+uvx apple-health-to-sqlite import Export.zip mine/
 uvx "datasette<1" mine/
 ```
 
