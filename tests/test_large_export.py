@@ -107,13 +107,15 @@ class LargeExportTest(unittest.TestCase):
 
         named = support.workspace("timing") / "health.db"
         shutil.copy(self.database, named)
-        day = support.one(named, "select max(local_date) from records")
+        parameters = {
+            "day": support.one(named, "select max(local_date) from records"),
+            "metric": "StepCount",
+        }
 
         connection = sqlite3.connect(named)
         try:
             for query in load_queries(named):
                 with self.subTest(query=query["name"]):
-                    parameters = {"day": day} if ":day" in query["sql"] else {}
                     started = time.perf_counter()
                     connection.execute(query["sql"], parameters).fetchall()
                     elapsed = time.perf_counter() - started
