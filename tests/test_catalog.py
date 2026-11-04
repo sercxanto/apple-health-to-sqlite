@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import unittest
 
-from applehealth import catalog
+from apple_health_to_sqlite import catalog
 
 from . import support
 

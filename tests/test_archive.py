@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 import zipfile
 
-from applehealth.archive import ExportArchive, ExportNotFound
+from apple_health_to_sqlite.archive import ExportArchive, ExportNotFound
 
 from . import support
 

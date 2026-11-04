@@ -51,7 +51,7 @@
       // message on one line and the location on the next:
       //
       //     F401 [*] `os` imported but unused
-      //      --> applehealth/db.py:1:8
+      //      --> apple_health_to_sqlite/db.py:1:8
       //
       // Defined inline in each task because tasks.json has nowhere to name a
       // matcher; only an extension can contribute one.

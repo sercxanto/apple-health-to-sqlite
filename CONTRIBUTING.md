@@ -25,7 +25,7 @@ installed, Datasette is forwarded on port 8001.
 
 ### Locally
 
-The importer itself needs nothing but Python ≥ 3.11 — `python3 -m applehealth`
+The importer itself needs nothing but Python ≥ 3.11 — `python3 -m apple_health_to_sqlite`
 works in a bare checkout. Only the dev tooling needs installing:
 
 ```bash
@@ -61,8 +61,8 @@ Arguments after `--` reach the underlying command, so
 To look at the result, build a directory from invented data and open it:
 
 ```bash
-python3 -m applehealth synthesize --days 120 export.zip
-python3 -m applehealth import export.zip sample/
+python3 -m apple_health_to_sqlite synthesize --days 120 export.zip
+python3 -m apple_health_to_sqlite import export.zip sample/
 datasette sample/
 ```
 
@@ -84,7 +84,7 @@ python3 -m unittest tests.test_import_workouts -v
 python3 -m unittest tests.test_derive.SleepViewTest.test_a_night_spans_midnight
 ```
 
-`poe coverage` measures `applehealth/` only, with branch coverage on, and fails
+`poe coverage` measures `apple_health_to_sqlite/` only, with branch coverage on, and fails
 if the total drops below the `fail_under` in pyproject.toml — the `coverage` CI
 job is that same command, so the threshold lives in one place and moves in one
 place. It runs the fast suite on purpose: measured both ways, the slow test
@@ -93,13 +93,13 @@ only the large-export path reaches is reported as uncovered rather than
 quietly counted.
 
 The slow test (`tests/test_large_export.py`) is skipped unless
-`APPLEHEALTH_SLOW_TESTS=1` is set. It synthesizes a few hundred thousand records
+`APPLE_HEALTH_TO_SQLITE_SLOW_TESTS=1` is set. It synthesizes a few hundred thousand records
 and takes a minute or two; CI runs it once per push, not per Python version.
 
 ## Layout
 
 ```
-applehealth/
+apple_health_to_sqlite/
     cli.py          argparse subcommands, output formatting
     pipeline.py     orchestration: archive → schema check → import → derive
     archive.py      finding files inside an export (zip, directory, bare XML)
@@ -164,16 +164,16 @@ When Apple adds an element, `schema-diff` and the `unhandled` table will point
 at it. Then:
 
 1. **Update the schema.** Add the declaration to
-   `applehealth/schema/healthkit-export-v14.dtd`, copying it from a real
+   `apple_health_to_sqlite/schema/healthkit-export-v14.dtd`, copying it from a real
    export's DTD (see below). This is the source of truth; nothing else moves
    until it does.
-2. **Add a handler** in `applehealth/importer.py`, and list the element in
+2. **Add a handler** in `apple_health_to_sqlite/importer.py`, and list the element in
    `TOP_LEVEL_ELEMENTS` or `CHILD_ELEMENTS`. `tests/test_dtd.py` fails until
    every declared element is accounted for, which is the point.
-3. **Add a table** in `applehealth/db.py` if the data does not fit an existing
+3. **Add a table** in `apple_health_to_sqlite/db.py` if the data does not fit an existing
    one. Give it a content-addressed primary key so re-import stays idempotent;
    child tables key on `(parent_id, seq)` or `(parent_id, name)`.
-4. **Synthesize it.** Teach `applehealth/synthetic.py` to emit the element —
+4. **Synthesize it.** Teach `apple_health_to_sqlite/synthetic.py` to emit the element —
    `tests/test_synthetic.py` asserts the synthesizer covers every element that
    can occur, so this is not optional. Synthetic exports must stay valid
    against the schema: only declared attributes, only declared nesting. An
@@ -189,19 +189,19 @@ Only someone with a real export can do this, and they can do it without
 sharing the file:
 
 ```bash
-python3 -m applehealth schema-diff /path/to/Export.zip
+python3 -m apple_health_to_sqlite schema-diff /path/to/Export.zip
 ```
 
 The output is declaration differences only — element and attribute names — so
 it is safe to paste into an issue. Apply those differences by hand to
-`applehealth/schema/healthkit-export-v14.dtd`, or replace the file wholesale
+`apple_health_to_sqlite/schema/healthkit-export-v14.dtd`, or replace the file wholesale
 with `extract-schema` output if the version has moved on. Keep Apple's own
 comments: at least one of them ("Any Records that appear as children of a
 correlation also appear as top-level records") describes behaviour the importer
 depends on, and a test asserts it is still there.
 
 Then follow the recipe above for anything newly declared, and record what you
-learned in `applehealth/schema/NOTES.md` — its Findings section is where the
+learned in `apple_health_to_sqlite/schema/NOTES.md` — its Findings section is where the
 non-obvious parts of the format live.
 
 Supported versions are 14 and newer. Adding support for older exports is not a
@@ -212,10 +212,10 @@ goal; see NOTES.md for what would be involved.
 Two generated files, both read from Apple's HealthKit documentation, so
 refreshing them needs no export and no permission:
 
-* `applehealth/catalog/category_values.json` — what a category record's value
+* `apple_health_to_sqlite/catalog/category_values.json` — what a category record's value
   name means: that `HKCategoryValueSeverityModerate` is `Moderate`, and the
   third rung of a four-rung scale.
-* `applehealth/catalog/quantity_types.json` — whether a quantity type's
+* `apple_health_to_sqlite/catalog/quantity_types.json` — whether a quantity type's
   samples are cumulative or discrete, which is what `daily_metrics` reads to
   fill in `day_value`.
 
@@ -225,7 +225,7 @@ poe refresh-catalog
 
 A few minutes and a couple of hundred requests; `--only categories` or
 `--only quantities` does one of them. Review the diff as documentation moving
-rather than code changing, and read `applehealth/catalog/NOTES.md` first if you
+rather than code changing, and read `apple_health_to_sqlite/catalog/NOTES.md` first if you
 are changing *what* is generated — in particular before touching `SCALE_ENUMS`,
 the one field there that is a judgement rather than something Apple states.
 
@@ -237,7 +237,7 @@ aggregates, and only loses the interpretation.
 
 Two sources, both synthetic:
 
-* `applehealth/synthetic.py` for realistic, multi-day data. `support.sample_database()`
+* `apple_health_to_sqlite/synthetic.py` for realistic, multi-day data. `support.sample_database()`
   caches one per test run.
 * `tests/fixtures/*.xml` for edge cases, where reading the exact input matters
   more than realism. Fixtures contain only the `<HealthData>` body;

@@ -4,19 +4,35 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import tomllib
 import unittest
+from pathlib import Path
 
-from applehealth import layout
+from apple_health_to_sqlite import layout
 
 from . import support
 
 
 def run(*arguments):
     return subprocess.run(
-        [sys.executable, "-m", "applehealth", *arguments],
+        [sys.executable, "-m", "apple_health_to_sqlite", *arguments],
         capture_output=True,
         text=True,
     )
+
+
+class CommandNameTest(unittest.TestCase):
+    def test_the_installed_command_is_health2sqlite(self):
+        pyproject = Path(__file__).parent.parent / "pyproject.toml"
+        project = tomllib.loads(pyproject.read_text("utf-8"))["project"]
+        self.assertEqual(
+            project["scripts"], {"health2sqlite": "apple_health_to_sqlite.cli:main"}
+        )
+
+    def test_help_uses_the_name_people_type(self):
+        result = run("--help")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(result.stdout.startswith("usage: health2sqlite"))
 
 
 class SynthesizeCommandTest(unittest.TestCase):
@@ -251,7 +267,7 @@ class ConfigurationTest(unittest.TestCase):
     def test_the_bundled_configuration_ships_with_the_package(self):
         """Inside the package, so `import` works from an installed wheel too."""
         directory = layout.config_dir()
-        self.assertEqual(directory.parent.name, "applehealth")
+        self.assertEqual(directory.parent.name, "apple_health_to_sqlite")
         for name in layout.CONFIG_FILES:
             self.assertTrue((directory / name).exists(), name)
 

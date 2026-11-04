@@ -22,20 +22,20 @@ inside every export**: `Export.xml` opens with a `<!DOCTYPE HealthData [ … ]>`
 block declaring every element and attribute, headed by a version comment. That
 DTD is what this project is built on, and a verbatim copy of it — taken from a
 real version 14 export — lives in
-[`applehealth/schema/`](../applehealth/schema/). Its
-[NOTES.md](../applehealth/schema/NOTES.md) collects what the schema reveals.
+[`apple_health_to_sqlite/schema/`](../apple_health_to_sqlite/schema/). Its
+[NOTES.md](../apple_health_to_sqlite/schema/NOTES.md) collects what the schema reveals.
 
 To see it in your own export (the block ends just before `<Me …>`, which holds
 your date of birth and blood type):
 
 ```bash
-python3 -m applehealth extract-schema Export.zip
+python3 -m apple_health_to_sqlite extract-schema Export.zip
 ```
 
 To check your export against the bundled copy:
 
 ```bash
-python3 -m applehealth schema-diff Export.zip
+python3 -m apple_health_to_sqlite schema-diff Export.zip
 ```
 
 That prints declaration differences only — element and attribute names, never a

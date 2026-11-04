@@ -1,4 +1,4 @@
-"""Regenerate the catalogues in `applehealth/catalog` from Apple's docs.
+"""Regenerate the catalogues in `apple_health_to_sqlite/catalog` from Apple's docs.
 
 The export's DTD declares `value CDATA #IMPLIED` and stops there, so nothing in
 the file says that a `HKCategoryTypeIdentifierLowerBackPain` record carries one
@@ -7,7 +7,7 @@ of the five `HKCategoryValueSeverity` names while a
 stages. Nor does it say that a day of `StepCount` samples is meant to be added
 up while a day of `HeartRate` samples is not. Apple documents both per
 identifier, and this script turns the documentation into the two lookup tables
-`applehealth/catalog` ships:
+`apple_health_to_sqlite/catalog` ships:
 
 * `category_values.json` — which value names a category type can carry.
 * `quantity_types.json` — whether a quantity type's samples are cumulative or
@@ -50,7 +50,7 @@ Usage:
     poe refresh-catalog -- --only quantities   # just one of them
     poe refresh-catalog -- --dry-run
 
-Read `applehealth/catalog/NOTES.md` before changing what this writes; it
+Read `apple_health_to_sqlite/catalog/NOTES.md` before changing what this writes; it
 documents which fields are Apple's and which one is a judgement call.
 """
 
@@ -68,7 +68,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
-CATALOG = ROOT / "applehealth" / "catalog"
+CATALOG = ROOT / "apple_health_to_sqlite" / "catalog"
 CATEGORY_OUTPUT = CATALOG / "category_values.json"
 QUANTITY_OUTPUT = CATALOG / "quantity_types.json"
 

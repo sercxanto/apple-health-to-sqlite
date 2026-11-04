@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import unittest
 
-from applehealth import dtd, importer
-from applehealth.archive import ExportArchive
+from apple_health_to_sqlite import dtd, importer
+from apple_health_to_sqlite.archive import ExportArchive
 
 from . import support
 

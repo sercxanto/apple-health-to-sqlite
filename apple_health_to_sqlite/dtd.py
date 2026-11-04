@@ -3,7 +3,7 @@
 `Export.xml` opens with a `<!DOCTYPE HealthData [ … ]>` internal subset that
 declares every element and attribute the file can contain, preceded by a
 version comment. That block is the only schema Apple ships, so this project
-treats it as authoritative: a copy lives in `applehealth/schema/`, the
+treats it as authoritative: a copy lives in `apple_health_to_sqlite/schema/`, the
 synthesizer emits it verbatim, and `schema-diff` compares a real export to it.
 
 The parser here is intentionally small. It understands `<!ELEMENT>` and
@@ -105,7 +105,7 @@ class Schema:
                 f"HealthKit export version {self.version} is not supported; "
                 f"this tool requires version {MIN_EXPORT_VERSION} or newer. "
                 f"Re-export from a current version of iOS, or see "
-                f"applehealth/schema/NOTES.md for what changed."
+                f"apple_health_to_sqlite/schema/NOTES.md for what changed."
             )
         return self.version
 
@@ -171,7 +171,9 @@ def bundled() -> Schema:
 
 def bundled_text() -> str:
     return (
-        resources.files("applehealth.schema").joinpath(BUNDLED_DTD).read_text("utf-8")
+        resources.files("apple_health_to_sqlite.schema")
+        .joinpath(BUNDLED_DTD)
+        .read_text("utf-8")
     )
 
 

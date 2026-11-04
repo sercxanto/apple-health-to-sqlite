@@ -108,7 +108,7 @@ def coverage() -> None:
 
 
 def refresh_catalog() -> None:
-    """Rebuild `applehealth/catalog/` from Apple's HealthKit documentation.
+    """Rebuild `apple_health_to_sqlite/catalog/` from Apple's HealthKit documentation.
 
     The only task here that goes near the network, and the only one whose
     output is committed rather than thrown away. Review the diff: it is the

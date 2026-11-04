@@ -6,7 +6,7 @@ import unittest
 import xml.etree.ElementTree as ElementTree
 import zipfile
 
-from applehealth import dtd, synthetic
+from apple_health_to_sqlite import dtd, synthetic
 
 from . import support
 

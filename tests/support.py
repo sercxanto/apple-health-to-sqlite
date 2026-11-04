@@ -23,12 +23,12 @@ import zipfile
 from functools import cache
 from pathlib import Path
 
-from applehealth import dtd, pipeline, synthetic
-from applehealth.importer import ImportOptions, ImportResult
+from apple_health_to_sqlite import dtd, pipeline, synthetic
+from apple_health_to_sqlite.importer import ImportOptions, ImportResult
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
-_temporary = tempfile.TemporaryDirectory(prefix="applehealth-tests-")
+_temporary = tempfile.TemporaryDirectory(prefix="apple-health-to-sqlite-tests-")
 atexit.register(_temporary.cleanup)
 WORKSPACE = Path(_temporary.name)
 _counter = itertools.count()

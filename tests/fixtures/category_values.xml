@@ -1,6 +1,6 @@
 <!-- Category records whose value is a name rather than a number. The export's
      DTD says only `value CDATA #IMPLIED`; which names are legal depends on the
-     type, and that mapping comes from `applehealth/catalog`. -->
+     type, and that mapping comes from `apple_health_to_sqlite/catalog`. -->
 
 <!-- A symptom on the severity scale: the case that has an ordinal. -->
 <Record type="HKCategoryTypeIdentifierLowerBackPain" value="HKCategoryValueSeverityModerate"

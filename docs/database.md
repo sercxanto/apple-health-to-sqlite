@@ -42,13 +42,13 @@ rebuilt after every import unless you pass `--no-derived`.
 Sleep stages, symptoms and mindful sessions state their value as a name —
 `HKCategoryValueSeverityModerate` — and the export's schema says only that it
 is text. Which names a type can carry is documented by Apple and not by the
-file, so it is kept in `applehealth/catalog/` and loaded into the two
+file, so it is kept in `apple_health_to_sqlite/catalog/` and loaded into the two
 `category_*` tables; `category_samples` joins them, giving `Moderate` beside
 the raw value and, where the values form a scale, an `ordinal` to sort by. The
 `symptoms` view is the same thing narrowed to the symptom diary.
 
 Nothing depends on it: a type or value the catalogue does not know keeps its
-raw name. See [applehealth/catalog/NOTES.md](../applehealth/catalog/NOTES.md).
+raw name. See [apple_health_to_sqlite/catalog/NOTES.md](../apple_health_to_sqlite/catalog/NOTES.md).
 
 ## Sums and averages
 

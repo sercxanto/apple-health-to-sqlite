@@ -31,24 +31,24 @@ dev = [
 ]
 
 [project.scripts]
-apple-health-to-sqlite = "applehealth.cli:main"
+health2sqlite = "apple_health_to_sqlite.cli:main"
 
 [tool.setuptools]
 packages = [
-    "applehealth",
-    "applehealth.schema",
-    "applehealth.datasette",
-    "applehealth.catalog",
+    "apple_health_to_sqlite",
+    "apple_health_to_sqlite.schema",
+    "apple_health_to_sqlite.datasette",
+    "apple_health_to_sqlite.catalog",
 ]
 
 # The DTD lives inside the package so that it is importable both from a plain
-# checkout and from an installed wheel (see applehealth/dtd.py). The Datasette
+# checkout and from an installed wheel (see apple_health_to_sqlite/dtd.py). The Datasette
 # configuration is there for the same reason: `import` has to find it either
 # way, and so must the catalogue `derive` loads.
 [tool.setuptools.package-data]
-"applehealth.schema" = ["*.dtd", "*.md"]
-"applehealth.datasette" = ["*.yml", "*.json"]
-"applehealth.catalog" = ["*.json", "*.md"]
+"apple_health_to_sqlite.schema" = ["*.dtd", "*.md"]
+"apple_health_to_sqlite.datasette" = ["*.yml", "*.json"]
+"apple_health_to_sqlite.catalog" = ["*.json", "*.md"]
 
 # Task runner: `poe` with no arguments lists these. They replace a Makefile, so
 # they have to work on Windows too — no shell syntax, no `mkdir -p`, no `cp`.
@@ -62,14 +62,14 @@ script = "tasks:test"
 [tool.poe.tasks.test-all]
 help = "Run every test, including the slow large-export test"
 script = "tasks:test"
-env = { APPLEHEALTH_SLOW_TESTS = "1" }
+env = { APPLE_HEALTH_TO_SQLITE_SLOW_TESTS = "1" }
 
 # What the `slow` CI job runs: the large-export test on its own, so it can be
 # reproduced locally without sitting through the rest of the suite.
 [tool.poe.tasks.test-slow]
 help = "Run only the slow large-export test"
 script = "tasks:test_slow"
-env = { APPLEHEALTH_SLOW_TESTS = "1" }
+env = { APPLE_HEALTH_TO_SQLITE_SLOW_TESTS = "1" }
 
 [tool.poe.tasks.coverage]
 help = "Measure test coverage and enforce the gate (terminal + htmlcov/)"
@@ -114,13 +114,13 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["E501"]
 
-# Coverage measures the package only: `applehealth/`, not the tests that
+# Coverage measures the package only: `apple_health_to_sqlite/`, not the tests that
 # exercise it, nor `tasks.py`/`tools/` which are development scaffolding. Branch
 # coverage is on because a lot of the interesting untested paths here are
 # `else` arms — a fallback that never fired in a test looks covered by line
 # count alone. `poe coverage` writes both a terminal summary and htmlcov/.
 [tool.coverage.run]
-source = ["applehealth"]
+source = ["apple_health_to_sqlite"]
 branch = true
 
 [tool.coverage.report]

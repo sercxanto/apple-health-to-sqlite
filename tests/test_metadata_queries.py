@@ -21,7 +21,7 @@ import sys
 import unittest
 from pathlib import Path
 
-from applehealth import layout
+from apple_health_to_sqlite import layout
 
 from . import support
 
@@ -241,7 +241,7 @@ class ImportedDirectoryTest(unittest.TestCase):
             [
                 sys.executable,
                 "-m",
-                "applehealth",
+                "apple_health_to_sqlite",
                 "import",
                 str(support.sample_export(days=6)),
                 str(directory),

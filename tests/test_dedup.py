@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import unittest
 
-from applehealth.dedup import deduplicated_value
+from apple_health_to_sqlite.dedup import deduplicated_value
 
 
 class DeduplicatedValueTest(unittest.TestCase):

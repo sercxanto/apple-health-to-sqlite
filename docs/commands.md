@@ -1,14 +1,14 @@
 # Commands
 
 ```
-python3 -m applehealth import EXPORT DIRECTORY
-python3 -m applehealth synthesize [OUTPUT]
-python3 -m applehealth extract-schema EXPORT [-o FILE]
-python3 -m applehealth schema-diff EXPORT
+python3 -m apple_health_to_sqlite import EXPORT DIRECTORY
+python3 -m apple_health_to_sqlite synthesize [OUTPUT]
+python3 -m apple_health_to_sqlite extract-schema EXPORT [-o FILE]
+python3 -m apple_health_to_sqlite schema-diff EXPORT
 ```
 
 Installed via `pip install .`, the same commands are available as
-`apple-health-to-sqlite <command>`. Every command has `--help`.
+`health2sqlite <command>`. Every command has `--help`.
 
 ## import
 

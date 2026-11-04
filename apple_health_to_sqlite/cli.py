@@ -1,7 +1,7 @@
 """Command line interface.
 
-python3 -m applehealth <command>          # from a checkout, no install
-apple-health-to-sqlite <command>          # once installed
+python3 -m apple_health_to_sqlite <command>    # from a checkout, no install
+health2sqlite <command>                        # once installed
 """
 
 from __future__ import annotations
@@ -46,7 +46,7 @@ skipped and new ones are added.\
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="apple-health-to-sqlite",
+        prog="health2sqlite",
         description="Convert an Apple Health export to SQLite, ready for Datasette.",
     )
     parser.add_argument("--version", action="version", version=__version__)

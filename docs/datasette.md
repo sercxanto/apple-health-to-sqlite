@@ -6,7 +6,7 @@ Datasette 0.65 is not part of this package and has to be installed separately
 (`pip install "datasette<1"`, or with pipx).
 
 ```bash
-python3 -m applehealth import Export.zip mine/
+python3 -m apple_health_to_sqlite import Export.zip mine/
 datasette mine/
 ```
 
@@ -15,7 +15,7 @@ folder and it picks up `metadata.yml`, `settings.json` and every `*.db` in it,
 so nothing has to be repeated on the command line. `import` builds that folder:
 it writes `health.db` and copies the two bundled configuration files next to
 it. Every run overwrites those copies, so make lasting changes in
-`applehealth/datasette/`.
+`apple_health_to_sqlite/datasette/`.
 
 The database file must be named `health.db`, since Datasette keys the
 configuration on the filename.
@@ -23,12 +23,12 @@ configuration on the filename.
 Outside such a directory, the equivalent is:
 
 ```bash
-datasette health.db -m applehealth/datasette/metadata.yml --setting sql_time_limit_ms 10000
+datasette health.db -m apple_health_to_sqlite/datasette/metadata.yml --setting sql_time_limit_ms 10000
 ```
 
 ## Ready-made queries
 
-The bundled [metadata.yml](../applehealth/datasette/metadata.yml) adds facets
+The bundled [metadata.yml](../apple_health_to_sqlite/datasette/metadata.yml) adds facets
 and nineteen ready queries, in four groups:
 
 * **Day to day** — steps per day, steps with 7- and 28-day averages, steps by
@@ -53,7 +53,7 @@ and a watch counting the same steps are not doubled; see
 in force. They belong in `settings.json` beside it (configuration directory
 mode, above), or on the command line.
 
-[settings.json](../applehealth/datasette/settings.json) raises
+[settings.json](../apple_health_to_sqlite/datasette/settings.json) raises
 `sql_time_limit_ms` from its 1000 ms default to 10 000. Not because the
 queries need it — see [Performance](performance.md) — but because the first
 query against a large database pays for reading cold pages off disk, and

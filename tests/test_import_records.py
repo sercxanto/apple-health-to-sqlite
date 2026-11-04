@@ -183,7 +183,7 @@ class UnknownElementTest(unittest.TestCase):
 
 class UnsupportedVersionTest(unittest.TestCase):
     def test_old_export_is_refused_with_an_explanation(self):
-        from applehealth import dtd
+        from apple_health_to_sqlite import dtd
 
         export = support.write_export(
             '<Record type="HKQuantityTypeIdentifierStepCount" unit="count"'

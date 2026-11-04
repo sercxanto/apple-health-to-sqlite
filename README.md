@@ -8,7 +8,7 @@ with [Datasette](https://datasette.io), browse it as a website on your own
 machine.
 
 ```bash
-python3 -m applehealth import Export.zip mine/
+python3 -m apple_health_to_sqlite import Export.zip mine/
 ```
 
 That is the whole setup. No runtime dependencies, nothing to install: a stock
@@ -43,8 +43,8 @@ workouts with routes — so you can look around before touching your own:
 
 ```bash
 pip install "datasette<1"      # the web interface; the importer needs nothing
-python3 -m applehealth synthesize --days 120 export.zip
-python3 -m applehealth import export.zip sample/
+python3 -m apple_health_to_sqlite synthesize --days 120 export.zip
+python3 -m apple_health_to_sqlite import export.zip sample/
 datasette sample/
 ```
 
@@ -57,7 +57,7 @@ Then open <http://localhost:8001>.
 2. Import it and open it:
 
    ```bash
-   python3 -m applehealth import Export.zip mine/
+   python3 -m apple_health_to_sqlite import Export.zip mine/
    datasette mine/
    ```
 
@@ -84,7 +84,7 @@ are added.
 
 Everything runs locally; nothing is uploaded anywhere. Please keep it that
 way: **do not `datasette publish` this database**, and never attach your
-export or database to an issue — `python3 -m applehealth schema-diff
+export or database to an issue — `python3 -m apple_health_to_sqlite schema-diff
 Export.zip` prints only the structure of your export and is safe to share.
 
 ## Documentation

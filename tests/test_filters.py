@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from applehealth.importer import ImportOptions
+from apple_health_to_sqlite.importer import ImportOptions
 
 from . import support
 

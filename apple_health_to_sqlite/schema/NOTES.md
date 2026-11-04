@@ -12,13 +12,13 @@ attribute, prefixed by a version comment:
 That DTD is the authority this project builds on. `healthkit-export-v14.dtd` in
 this directory is a verbatim copy of it, used three ways:
 
-1. `applehealth/synthetic.py` copies it into the synthetic exports the test
+1. `apple_health_to_sqlite/synthetic.py` copies it into the synthetic exports the test
    suite runs on, and emits only elements, attributes and nesting the
    schema declares — so synthesizer and importer cannot drift apart.
 2. `tests/test_dtd.py` asserts that every declared element is handled by the
    importer, and `tests/test_synthetic.py` that every element which *can occur*
    is exercised.
-3. `apple-health-to-sqlite schema-diff` compares a real export against it.
+3. `health2sqlite schema-diff` compares a real export against it.
 
 ## Provenance
 
@@ -29,7 +29,7 @@ instructive — see [Findings](#findings) below.
 To check it against another export:
 
 ```bash
-python3 -m applehealth schema-diff /path/to/Export.zip
+python3 -m apple_health_to_sqlite schema-diff /path/to/Export.zip
 ```
 
 That prints declaration differences only — element and attribute names, never
@@ -93,7 +93,7 @@ An export contains more than `Export.xml`:
 | --- | --- |
 | `Export.xml` | yes — this schema |
 | `export_cda.xml` | no — clinical documents in HL7 CDA format, a different schema entirely |
-| `workout-routes/*.gpx` | yes — GPX 1.1, parsed by `applehealth/routes.py` |
+| `workout-routes/*.gpx` | yes — GPX 1.1, parsed by `apple_health_to_sqlite/routes.py` |
 | `electrocardiograms/*.csv` | no — one CSV per ECG, with its own header format |
 
 `ClinicalRecord` elements in `Export.xml` are imported as *references* (they

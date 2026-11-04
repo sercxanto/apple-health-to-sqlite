@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import unittest
 
-from applehealth import synthetic
+from apple_health_to_sqlite import synthetic
 
 from . import support
 

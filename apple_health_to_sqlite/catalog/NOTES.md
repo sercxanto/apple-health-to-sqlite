@@ -72,7 +72,7 @@ laid beside the raw sum, never replacing it.
 
 ## What this is not
 
-**It is not a second schema.** `applehealth/schema/` stays the source of truth
+**It is not a second schema.** `apple_health_to_sqlite/schema/` stays the source of truth
 for what an export contains — elements, attributes, nesting. The catalogue only
 attaches meaning to values an export already carries, and it is deliberately
 powerless:

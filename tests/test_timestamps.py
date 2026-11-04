@@ -6,7 +6,7 @@ import random
 import unittest
 from datetime import UTC, datetime, timedelta, timezone
 
-from applehealth import timestamps
+from apple_health_to_sqlite import timestamps
 
 
 class ParseTest(unittest.TestCase):

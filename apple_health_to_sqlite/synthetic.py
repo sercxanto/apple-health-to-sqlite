@@ -5,8 +5,8 @@ health data to work on this project. It produces an `export.zip` with the same
 structure the Health app writes — the bundled DTD verbatim, records, workouts
 with GPX routes, activity summaries — at any size you like.
 
-It copies the DTD from `applehealth/schema/` rather than embedding its own, and
-writes every element that schema allows to occur — so the test suite exercises
+It copies the DTD from `apple_health_to_sqlite/schema/` rather than embedding its
+own, and writes every element that schema allows to occur — so the test suite exercises
 every importer handler, and this module and the importer cannot drift apart.
 The one exception is `WorkoutActivity`, which version 14 declares but
 references from no content model: emitting it would produce an invalid
@@ -90,8 +90,8 @@ def wrapped_tag(name: str, inner: str, indent: int = 1, **attributes) -> str:
 def symptom_choices() -> list[tuple[str, list[str]]]:
     """Symptom types with the value names each one accepts, from the catalogue.
 
-    Taking both sides from `applehealth/catalog` rather than listing a few here
-    keeps the synthesized pairs legal — a symptom's value has to be a member of
+    Taking both sides from `apple_health_to_sqlite/catalog` rather than listing a few
+    here keeps the synthesized pairs legal — a symptom's value has to be a member of
     the enumeration its own type declares — and keeps this module from growing
     a second opinion about which is which.
     """

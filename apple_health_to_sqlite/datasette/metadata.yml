@@ -1,6 +1,6 @@
 # Datasette configuration for a database built by apple-health-to-sqlite.
 #
-#   datasette health.db -m applehealth/datasette/metadata.yml --setting sql_time_limit_ms 10000
+#   datasette health.db -m apple_health_to_sqlite/datasette/metadata.yml --setting sql_time_limit_ms 10000
 #
 # The database file must be named health.db, since Datasette derives the
 # database name from the filename and the settings below are keyed on it.

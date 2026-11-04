@@ -16,7 +16,7 @@ has a real `Export.zip`; you must treat it as off limits.
   history: do not open it. Say why, and offer the alternative below.
 * **When something genuinely needs facts from the real export**, hand over a
   command the user runs themselves, whose output contains structure but no
-  measurements. `python3 -m applehealth schema-diff Export.zip` is the built-in
+  measurements. `python3 -m apple_health_to_sqlite schema-diff Export.zip` is the built-in
   one; if you need something else, design it to print declarations, names or
   counts — never values — and say so explicitly when you hand it over.
 * **Never** add a real export, or anything derived from one, to the repository,
@@ -25,16 +25,16 @@ has a real `Export.zip`; you must treat it as off limits.
 
 You never need the real export. Every input you develop and test against is
 synthetic — the real format, invented data — and you make your own:
-`python3 -m applehealth synthesize --days 120 export.zip`.
+`python3 -m apple_health_to_sqlite synthesize --days 120 export.zip`.
 
 ## Invariants
 
 These hold across the whole project. If a change would break one, that is a
 design decision to raise with the user, not something to work around quietly.
 
-1. **The bundled DTD is the source of truth.** `applehealth/schema/*.dtd`
+1. **The bundled DTD is the source of truth.** `apple_health_to_sqlite/schema/*.dtd`
    drives the synthesizer, the handler-coverage test, and `schema-diff`. Code
-   must not carry its own idea of the schema. `applehealth/catalog/` is not an
+   must not carry its own idea of the schema. `apple_health_to_sqlite/catalog/` is not an
    exception to that and must not become one: it describes what category
    *values* mean, which the DTD cannot express, it is generated from Apple's
    documentation rather than written by hand, nothing on the import path reads

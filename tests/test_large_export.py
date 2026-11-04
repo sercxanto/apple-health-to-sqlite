@@ -1,6 +1,6 @@
 """Slow test: the two properties that only show up at size.
 
-Opt in with `APPLEHEALTH_SLOW_TESTS=1` (or `poe test-all`). It synthesizes a few
+Opt in with `APPLE_HEALTH_TO_SQLITE_SLOW_TESTS=1` (or `poe test-all`). It synthesizes a few
 hundred thousand records, which takes a minute or two.
 
 What it guards:
@@ -19,7 +19,7 @@ import shutil
 import sys
 import unittest
 
-from applehealth import synthetic
+from apple_health_to_sqlite import synthetic
 
 from . import support
 
@@ -32,7 +32,7 @@ MEMORY_LIMIT_MB = 400
 #: chosen; it is a proxy for "does not scan `records`", not a latency target.
 CANNED_QUERY_LIMIT_S = 0.2
 
-SLOW_TESTS_ENABLED = os.environ.get("APPLEHEALTH_SLOW_TESTS") == "1"
+SLOW_TESTS_ENABLED = os.environ.get("APPLE_HEALTH_TO_SQLITE_SLOW_TESTS") == "1"
 
 
 def peak_memory_mb() -> float:
@@ -41,7 +41,9 @@ def peak_memory_mb() -> float:
     return usage / 1024 if sys.platform.startswith("linux") else usage / (1024 * 1024)
 
 
-@unittest.skipUnless(SLOW_TESTS_ENABLED, "set APPLEHEALTH_SLOW_TESTS=1 to run")
+@unittest.skipUnless(
+    SLOW_TESTS_ENABLED, "set APPLE_HEALTH_TO_SQLITE_SLOW_TESTS=1 to run"
+)
 class LargeExportTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
