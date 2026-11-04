@@ -7,7 +7,9 @@ python3 -m apple_health_to_sqlite extract-schema EXPORT [-o FILE]
 python3 -m apple_health_to_sqlite schema-diff EXPORT
 ```
 
-Installed via `pip install .`, the same commands are available as
+That form works in a checkout with nothing installed. Outside one,
+`uvx --from apple-health-to-sqlite health2sqlite <command>` runs the same
+commands; after `uv tool install apple-health-to-sqlite` they are available as
 `health2sqlite <command>`. Every command has `--help`.
 
 ## import

@@ -101,12 +101,13 @@ removes it.
 
 Anything you install has to be removable by deleting one directory.
 
-* **Use a virtualenv** for dev tooling — `python3 -m venv .venv` in the
-  checkout (`.venv/` is ignored), or a throwaway one under your scratch
-  directory. Install into it with its own `pip`, and call its binaries by path
-  rather than activating a shell you cannot keep.
+* **Use uv** for dev tooling: `uv run` and `uv sync` keep everything in `.venv/`
+  in the checkout, which is ignored. If uv is not on the PATH, install it into a
+  throwaway virtualenv under your scratch directory, point `UV_CACHE_DIR` there
+  as well, and call it by path rather than activating a shell you cannot keep.
 * **Never install into the user's environment**: no `pipx install`, no
-  `pip install --user`, no `brew install`, no editing shell profiles. pipx in
+  `uv tool install`, no `pip install --user`, no `brew install`, no editing
+  shell profiles. pipx in
   particular looks harmless because it isolates each tool, but it still puts
   commands on the user's PATH and leaves them there after you are gone.
 * **If a task genuinely needs something installed globally**, say so and let

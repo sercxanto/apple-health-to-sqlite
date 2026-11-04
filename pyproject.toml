@@ -22,16 +22,19 @@ classifiers = [
 # virtualenv. See CONTRIBUTING.md for when an exception is acceptable.
 dependencies = []
 
-[project.optional-dependencies]
+[project.scripts]
+health2sqlite = "apple_health_to_sqlite.cli:main"
+
+# A group rather than an extra: `uv run` and `uv sync` install it by default,
+# so `uv run poe check` works in a fresh clone, and it stays out of the metadata
+# published with the package. uv.lock pins it; run `uv lock` after changing it.
+[dependency-groups]
 dev = [
     "coverage>=7",
     "datasette>=0.65,<1",
     "poethepoet>=0.24",
     "ruff>=0.6",
 ]
-
-[project.scripts]
-health2sqlite = "apple_health_to_sqlite.cli:main"
 
 [tool.setuptools]
 packages = [

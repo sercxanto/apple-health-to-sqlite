@@ -11,7 +11,14 @@
   // (add -o Dir::Etc::sourceparts=/dev/null to apt-get update; a third-party
   // repository in the base image has an unverifiable signature.)
 
-  "postCreateCommand": "pip install --user -e '.[dev]'",
+  // The environment lives outside the workspace: the workspace is bind-mounted,
+  // so a `.venv/` in it may have been built on the host for another operating
+  // system, and uv would replace it under the host's feet. `python3 -m uv`
+  // because ~/.local/bin is not reliably on the PATH this early.
+  "containerEnv": {
+    "UV_PROJECT_ENVIRONMENT": "/home/vscode/.venv"
+  },
+  "postCreateCommand": "pip install --user uv && python3 -m uv sync",
   "forwardPorts": [8001],
   "portsAttributes": {
     "8001": {
@@ -36,6 +43,6 @@
     }
   },
   "remoteEnv": {
-    "PATH": "${containerEnv:PATH}:/home/vscode/.local/bin"
+    "PATH": "/home/vscode/.venv/bin:${containerEnv:PATH}:/home/vscode/.local/bin"
   }
 }

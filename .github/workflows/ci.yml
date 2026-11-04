@@ -14,17 +14,19 @@ jobs:
         python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      # An exact version, because setup-uv publishes no major tags such as v10.
+      - uses: astral-sh/setup-uv@v10.3.3
         with:
           python-version: ${{ matrix.python-version }}
+      # --locked fails if uv.lock has fallen behind pyproject.toml.
       - name: Install
-        run: pip install -e ".[dev]"
+        run: uv sync --locked
       # Through poe, so CI runs exactly what `poe lint` and `poe test` run
       # locally. The tasks live in pyproject.toml.
       - name: Lint
-        run: poe lint
+        run: uv run poe lint
       - name: Test
-        run: poe test
+        run: uv run poe test
 
   coverage:
     # The gate is `fail_under` in pyproject.toml, so this job enforces exactly
@@ -34,13 +36,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v10.3.3
         with:
           python-version: "3.12"
       - name: Install
-        run: pip install -e ".[dev]"
+        run: uv sync --locked
       - name: Coverage
-        run: poe coverage
+        run: uv run poe coverage
       - name: Upload HTML report
         # Also when the step above failed: a tripped gate is exactly when you
         # want the line-by-line report.
@@ -55,10 +57,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v10.3.3
         with:
           python-version: "3.12"
       - name: Install
-        run: pip install -e ".[dev]"
+        run: uv sync --locked
       - name: Slow tests
-        run: poe test-slow
+        run: uv run poe test-slow

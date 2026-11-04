@@ -21,21 +21,29 @@ reference.
 ### Devcontainer (recommended)
 
 Open the repository in VS Code and reopen in the container. Everything is
-installed, Datasette is forwarded on port 8001.
+installed and on the PATH, so plain `poe check` works; Datasette is forwarded on
+port 8001. The container keeps its environment in `~/.venv` rather than in the
+checkout, because the workspace is bind-mounted and a `.venv/` built on the host
+would be for the wrong operating system.
 
 ### Locally
 
-The importer itself needs nothing but Python ≥ 3.11 — `python3 -m apple_health_to_sqlite`
-works in a bare checkout. Only the dev tooling needs installing:
+All you need is [uv](https://docs.astral.sh/uv/); there is no setup step of its
+own:
 
 ```bash
-python3 -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
+uv run poe check
 ```
 
-If you prefer not to have a virtualenv, `pipx install poethepoet`,
-`pipx install datasette` and `pipx install ruff` give you the three commands
-the tasks and tests call.
+`uv run` creates `.venv/` if necessary, brings it in line with `uv.lock`,
+including the `dev` dependency group and an editable install of the checkout,
+and runs the command there. Everything below is written as plain `poe …`: put
+`uv run` in front, or `source .venv/bin/activate` once. After changing a
+dependency in `pyproject.toml`, run `uv lock` and commit `uv.lock`.
+
+The importer itself is standard library only, so the
+`python3 -m apple_health_to_sqlite` commands in these documents work in a bare
+checkout on any Python ≥ 3.11.
 
 ## Commands
 

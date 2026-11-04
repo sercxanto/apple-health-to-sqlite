@@ -2,12 +2,13 @@
 
 ## Opening the database
 
-Datasette 0.65 is not part of this package and has to be installed separately
-(`pip install "datasette<1"`, or with pipx).
+Datasette 0.65 is not part of this package. `uvx` fetches it on demand; to
+install it instead, use `uv tool install "datasette<1"`, and then call plain
+`datasette`.
 
 ```bash
-python3 -m apple_health_to_sqlite import Export.zip mine/
-datasette mine/
+uvx --from apple-health-to-sqlite health2sqlite import Export.zip mine/
+uvx "datasette<1" mine/
 ```
 
 Datasette is configured through a *configuration directory*: point it at a
@@ -66,8 +67,11 @@ first is to check whether it is scanning `records` when `daily_metrics` or
 ## Plugins
 
 ```bash
-datasette install datasette-cluster-map datasette-vega
+uvx --with datasette-cluster-map --with datasette-vega "datasette<1" mine/
 ```
+
+To install Datasette with them once and for all, `uv tool install "datasette<1"
+--with datasette-cluster-map --with datasette-vega`.
 
 `datasette-cluster-map` picks up `workout_points` automatically (it looks for
 `latitude`/`longitude` columns); `datasette-vega` adds a chart tab to every

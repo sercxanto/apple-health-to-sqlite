@@ -8,11 +8,12 @@ with [Datasette](https://datasette.io), browse it as a website on your own
 machine.
 
 ```bash
-python3 -m apple_health_to_sqlite import Export.zip mine/
+uvx --from apple-health-to-sqlite health2sqlite import Export.zip mine/
 ```
 
-That is the whole setup. No runtime dependencies, nothing to install: a stock
-Python 3.11 is enough, even for an export of several gigabytes.
+That is the whole setup, given [uv](https://docs.astral.sh/uv/). The tool has no
+runtime dependencies, so nothing else gets installed, and it stays light even on
+an export of several gigabytes.
 
 ## What you can ask it
 
@@ -42,10 +43,9 @@ The project can invent a realistic export — steps, heart rate, sleep stages,
 workouts with routes — so you can look around before touching your own:
 
 ```bash
-pip install "datasette<1"      # the web interface; the importer needs nothing
-python3 -m apple_health_to_sqlite synthesize --days 120 export.zip
-python3 -m apple_health_to_sqlite import export.zip sample/
-datasette sample/
+uvx --from apple-health-to-sqlite health2sqlite synthesize --days 120 export.zip
+uvx --from apple-health-to-sqlite health2sqlite import export.zip sample/
+uvx "datasette<1" sample/
 ```
 
 Then open <http://localhost:8001>.
@@ -57,14 +57,21 @@ Then open <http://localhost:8001>.
 2. Import it and open it:
 
    ```bash
-   python3 -m apple_health_to_sqlite import Export.zip mine/
-   datasette mine/
+   uvx --from apple-health-to-sqlite health2sqlite import Export.zip mine/
+   uvx "datasette<1" mine/
    ```
 
 The directory holds the database and Datasette's configuration, so that is all
 Datasette needs to be told. A new export a few months later goes into the same
 directory: re-importing is safe, rows you already have are skipped and new ones
 are added.
+
+To keep the command around instead of spelling it out each time:
+
+```bash
+uv tool install apple-health-to-sqlite
+health2sqlite import Export.zip mine/
+```
 
 ## Why this one
 
@@ -84,8 +91,8 @@ are added.
 
 Everything runs locally; nothing is uploaded anywhere. Please keep it that
 way: **do not `datasette publish` this database**, and never attach your
-export or database to an issue — `python3 -m apple_health_to_sqlite schema-diff
-Export.zip` prints only the structure of your export and is safe to share.
+export or database to an issue — `health2sqlite schema-diff Export.zip` prints
+only the structure of your export and is safe to share.
 
 ## Documentation
 
@@ -95,8 +102,9 @@ Export.zip` prints only the structure of your export and is safe to share.
 * [The export format](docs/schema.md) — Apple's schema and its traps
 * [Performance](docs/performance.md) — import and query timings
 
-Requires Python 3.11 or newer and an export of HealthKit version 14 or newer
-(roughly iOS 16 onwards). Contributions are welcome — see
+Requires uv, which fetches Python 3.11 or newer if you do not have it, and an
+export of HealthKit version 14 or newer (roughly iOS 16 onwards). Contributions
+are welcome — see
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Licence
