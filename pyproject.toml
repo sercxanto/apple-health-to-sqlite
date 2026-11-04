@@ -9,11 +9,15 @@ description = "Convert an Apple Health export (HealthKit export version 14+) to 
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
+authors = [{ name = "Georg Lutz" }]
 keywords = ["apple health", "healthkit", "sqlite", "datasette", "quantified self"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: End Users/Desktop",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Database",
 ]
 
@@ -21,6 +25,10 @@ classifiers = [
 # it has to run on a stock python3 against a multi-gigabyte export without a
 # virtualenv. See CONTRIBUTING.md for when an exception is acceptable.
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/sercxanto/apple-health-to-sqlite"
+Issues = "https://github.com/sercxanto/apple-health-to-sqlite/issues"
 
 [project.scripts]
 health2sqlite = "apple_health_to_sqlite.cli:main"

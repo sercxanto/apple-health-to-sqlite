@@ -96,16 +96,21 @@ only the structure of your export and is safe to share.
 
 ## Documentation
 
-* [Commands](docs/commands.md) — every command and option
-* [Database layout](docs/database.md) — the tables, and what their numbers mean
-* [Datasette](docs/datasette.md) — opening the database, settings, plugins
-* [The export format](docs/schema.md) — Apple's schema and its traps
-* [Performance](docs/performance.md) — import and query timings
+* [Commands](https://github.com/sercxanto/apple-health-to-sqlite/blob/main/docs/commands.md)
+  — every command and option
+* [Database layout](https://github.com/sercxanto/apple-health-to-sqlite/blob/main/docs/database.md)
+  — the tables, and what their numbers mean
+* [Datasette](https://github.com/sercxanto/apple-health-to-sqlite/blob/main/docs/datasette.md)
+  — opening the database, settings, plugins
+* [The export format](https://github.com/sercxanto/apple-health-to-sqlite/blob/main/docs/schema.md)
+  — Apple's schema and its traps
+* [Performance](https://github.com/sercxanto/apple-health-to-sqlite/blob/main/docs/performance.md)
+  — import and query timings
 
 Requires uv, which fetches Python 3.11 or newer if you do not have it, and an
 export of HealthKit version 14 or newer (roughly iOS 16 onwards). Contributions
 are welcome — see
-[CONTRIBUTING.md](CONTRIBUTING.md).
+[CONTRIBUTING.md](https://github.com/sercxanto/apple-health-to-sqlite/blob/main/CONTRIBUTING.md).
 
 ## Licence
 
