@@ -1,9 +1,7 @@
 # Commands
 
 ```
-python3 -m applehealth import EXPORT DATABASE
-python3 -m applehealth demo [DIRECTORY]
-python3 -m applehealth serve [DIRECTORY]
+python3 -m applehealth import EXPORT DIRECTORY
 python3 -m applehealth synthesize [OUTPUT]
 python3 -m applehealth extract-schema EXPORT [-o FILE]
 python3 -m applehealth schema-diff EXPORT
@@ -14,8 +12,20 @@ Installed via `pip install .`, the same commands are available as
 
 ## import
 
-Reads an export and writes it into a SQLite database, creating the database
-if it does not exist yet.
+Reads an export and writes it into a directory that Datasette can open as it
+is:
+
+| Path | Holds |
+| --- | --- |
+| `DIRECTORY/health.db` | the SQLite database, created if it does not exist yet |
+| `DIRECTORY/metadata.yml`, `DIRECTORY/settings.json` | Datasette's configuration, copied from the package on every run |
+
+The directory is created if necessary; `datasette DIRECTORY` opens the result.
+See [Datasette](datasette.md).
+
+The command changes nothing if `DIRECTORY` is a file, or if it holds
+`metadata.yml` or `settings.json` but no `health.db`, since those files would
+then not be copies from an earlier run.
 
 `EXPORT` can be the `Export.zip` from the iPhone, an unpacked directory, or a
 bare XML file. The main file is spelled `Export.xml` on some devices and
@@ -36,33 +46,6 @@ new ones are added.
 
 At the end of the run, the importer reports any element it did not recognise.
 Those are kept verbatim in the `unhandled` table rather than dropped.
-
-## demo
-
-Builds a demonstration from invented data and serves it: synthesizes an
-export into `DIRECTORY` (default `demo/`), imports it into
-`DIRECTORY/health.db`, and runs `serve` on the directory. No health data of
-yours is involved.
-
-| Option | Effect |
-| --- | --- |
-| `--days N` | how many days to invent (default 120) |
-| `--port N` | port to serve on (default 8001) |
-| `--no-serve` | build the database but do not serve it |
-
-## serve
-
-Serves a database that has already been built, with Datasette, in the
-foreground until Ctrl-C. `DIRECTORY` (default `demo/`) has to contain the
-database as `health.db`, under exactly that name. See
-[Datasette](datasette.md) for what the command sets up.
-
-| Option | Effect |
-| --- | --- |
-| `--port N` | port to serve on (default 8001) |
-
-Datasette 0.65 has to be installed (`pip install "datasette<1"`, or with pipx); this
-package never imports it and finds it either way.
 
 ## synthesize
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import sqlite3
 import time
+from pathlib import Path
 
 from . import db, derive, dtd, routes
 from .archive import ExportArchive
@@ -37,6 +38,8 @@ def run_import(
         # a subset of the data and staying quiet about it.
         version = schema.require_supported()
 
+        # Only now, so a mistyped export path leaves no stray directory behind.
+        Path(database_path).parent.mkdir(parents=True, exist_ok=True)
         connection = db.connect(database_path)
         importer = Importer(connection, options)
 

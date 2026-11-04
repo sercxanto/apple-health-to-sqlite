@@ -5,9 +5,8 @@ from __future__ import annotations
 import subprocess
 import sys
 import unittest
-from unittest import mock
 
-from applehealth import demo
+from applehealth import layout
 
 from . import support
 
@@ -42,40 +41,115 @@ class ImportCommandTest(unittest.TestCase):
         cls.export = support.sample_export(days=4)
 
     def test_imports_and_prints_a_summary(self):
-        database = support.workspace("cli") / "health.db"
-        result = run("import", str(self.export), str(database))
+        directory = support.workspace("cli")
+        result = run("import", str(self.export), str(directory))
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("export version 14", result.stdout)
         self.assertIn("records", result.stdout)
-        self.assertGreater(support.one(database, "select count(*) from records"), 0)
+        self.assertGreater(
+            support.one(directory / "health.db", "select count(*) from records"), 0
+        )
 
     def test_quiet_suppresses_the_summary(self):
-        database = support.workspace("cli") / "health.db"
-        result = run("import", str(self.export), str(database), "--quiet")
+        directory = support.workspace("cli")
+        result = run("import", str(self.export), str(directory), "--quiet")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, "")
 
     def test_filters_are_wired_through(self):
-        database = support.workspace("cli") / "health.db"
+        directory = support.workspace("cli")
         result = run(
-            "import", str(self.export), str(database), "--types", "StepCount", "--quiet"
+            "import",
+            str(self.export),
+            str(directory),
+            "--types",
+            "StepCount",
+            "--quiet",
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(
             {
                 row[0]
                 for row in support.rows(
-                    database, "select distinct type_short from records"
+                    directory / "health.db", "select distinct type_short from records"
                 )
             },
             {"StepCount"},
         )
 
     def test_missing_export_fails_with_a_message_not_a_traceback(self):
-        result = run("import", "/nope/Export.zip", "/tmp/unused.db")
+        directory = support.workspace("cli") / "mine"
+        result = run("import", "/nope/Export.zip", str(directory))
         self.assertEqual(result.returncode, 1)
         self.assertIn("error:", result.stderr)
         self.assertNotIn("Traceback", result.stderr)
+        self.assertFalse(directory.exists())
+
+
+class ImportDirectoryTest(unittest.TestCase):
+    """`import` leaves a directory that `datasette DIRECTORY` can open as it is."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.export = support.sample_export(days=2)
+
+    def test_creates_the_directory_with_database_and_configuration(self):
+        directory = support.workspace("cli") / "new" / "mine"
+        result = run("import", str(self.export), str(directory), "--quiet")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((directory / layout.DATABASE_NAME).exists())
+        for name in layout.CONFIG_FILES:
+            self.assertEqual(
+                (directory / name).read_bytes(),
+                (layout.config_dir() / name).read_bytes(),
+                name,
+            )
+
+    def test_importing_again_refreshes_the_configuration_and_keeps_the_rows(self):
+        directory = support.workspace("cli")
+        run("import", str(self.export), str(directory), "--quiet")
+        database = directory / layout.DATABASE_NAME
+        records = support.one(database, "select count(*) from records")
+        (directory / "metadata.yml").write_text("title: out of date\n")
+
+        result = run("import", str(self.export), str(directory), "--quiet")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(support.one(database, "select count(*) from records"), records)
+        self.assertEqual(
+            (directory / "metadata.yml").read_bytes(),
+            (layout.config_dir() / "metadata.yml").read_bytes(),
+        )
+
+    def test_the_summary_says_how_to_open_the_result(self):
+        directory = support.workspace("cli")
+        result = run("import", str(self.export), str(directory))
+        self.assertIn(f"View it with: datasette {directory}\n", result.stdout)
+
+    def test_the_summary_quotes_a_directory_with_spaces(self):
+        directory = support.workspace("cli") / "my data"
+        result = run("import", str(self.export), str(directory))
+        self.assertIn(f'View it with: datasette "{directory}"\n', result.stdout)
+
+    def test_an_existing_file_is_left_alone(self):
+        target = support.workspace("cli") / "notes"
+        target.write_text("mine\n")
+        result = run("import", str(self.export), str(target))
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(target.read_text(), "mine\n")
+
+    def test_a_metadata_file_without_a_database_is_not_overwritten(self):
+        directory = support.workspace("cli")
+        (directory / "metadata.yml").write_text("somebody else's\n")
+        result = run("import", str(self.export), str(directory))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(str(directory / "metadata.yml"), result.stderr)
+        self.assertEqual((directory / "metadata.yml").read_text(), "somebody else's\n")
+        self.assertFalse((directory / layout.DATABASE_NAME).exists())
+
+    def test_a_failed_import_leaves_no_configuration_behind(self):
+        directory = support.workspace("cli")
+        run("import", "/nope/Export.zip", str(directory))
+        self.assertEqual(list(directory.iterdir()), [])
 
 
 class SchemaCommandTest(unittest.TestCase):
@@ -129,106 +203,66 @@ class SchemaCommandTest(unittest.TestCase):
         self.assertNotIn("987654", result.stdout)
 
 
-class DemoCommandTest(unittest.TestCase):
-    """`demo` and `serve` replace what the Makefile used to do in shell.
-
-    Serving itself needs Datasette and a free port, so what is checked here is
-    everything up to the handover: that the directory Datasette is pointed at
-    ends up holding a database *and* the configuration next to it, which is the
-    whole reason the command exists.
-    """
-
-    def test_demo_builds_a_directory_datasette_can_serve(self):
-        target = support.workspace("demo") / "demo"
-        result = run("demo", "--days", "2", "--no-serve", str(target))
-        self.assertEqual(result.returncode, 0, result.stderr)
-
-        self.assertTrue((target / "health.db").exists())
-        # Datasette keys canned queries on the filename, so it has to be this.
-        self.assertEqual(demo.database_path(target).name, "health.db")
-        for name in demo.CONFIG_FILES:
-            self.assertTrue((target / name).exists(), name)
-
-    def test_demo_imports_the_data_it_synthesized(self):
-        target = support.workspace("demo") / "demo"
-        run("demo", "--days", "2", "--no-serve", str(target))
-        self.assertGreater(
-            support.one(target / "health.db", "select count(*) from records"), 0
-        )
-
-    def test_serve_without_a_database_explains_itself(self):
-        empty = support.workspace("demo")
-        result = run("serve", str(empty))
-        self.assertEqual(result.returncode, 1)
-        self.assertIn("does not exist", result.stderr)
-        self.assertNotIn("Traceback", result.stderr)
-
-    def test_serve_does_not_create_the_directory_it_was_given(self):
-        """A typo in the path should be an error, not a stray empty folder."""
-        missing = support.workspace("demo") / "typo"
-        run("serve", str(missing))
-        self.assertFalse(missing.exists())
-
-
-class DatasetteDiscoveryTest(unittest.TestCase):
-    """Both installations CONTRIBUTING.md offers have to be found.
-
-    pip puts Datasette in this environment, where it is importable; pipx puts
-    it in one of its own, where only the script on the PATH exists. Looking
-    for the module alone told everyone on the pipx route that Datasette was
-    not installed, in the same shell where `datasette` ran fine.
-    """
-
-    def test_an_importable_datasette_runs_in_this_interpreter(self):
-        with mock.patch.object(demo, "find_spec", return_value=object()):
-            self.assertEqual(
-                demo.datasette_command(), [sys.executable, "-m", "datasette"]
-            )
-
-    def test_a_pipx_datasette_is_found_on_the_path(self):
-        with (
-            mock.patch.object(demo, "find_spec", return_value=None),
-            mock.patch.object(demo.shutil, "which", return_value="/pipx/bin/datasette"),
-        ):
-            self.assertEqual(demo.datasette_command(), ["/pipx/bin/datasette"])
-
-    def test_neither_is_an_error_naming_both_ways_to_install(self):
-        with (
-            mock.patch.object(demo, "find_spec", return_value=None),
-            mock.patch.object(demo.shutil, "which", return_value=None),
-            self.assertRaises(demo.DatasetteMissing) as raised,
-        ):
-            demo.datasette_command()
-        self.assertIn("pip install datasette", str(raised.exception))
-        self.assertIn("pipx install datasette", str(raised.exception))
-
-
 class HelpTest(unittest.TestCase):
-    def test_serve_says_that_it_copies_the_configuration(self):
-        """The copying is the part of `serve` nobody expects."""
-        result = run("serve", "--help")
+    def test_import_says_what_it_puts_in_the_directory(self):
+        result = run("import", "--help")
         self.assertEqual(result.returncode, 0, result.stderr)
-        for name in demo.CONFIG_FILES:
+        for name in (layout.DATABASE_NAME, *layout.CONFIG_FILES):
             self.assertIn(name, result.stdout)
-        self.assertIn(demo.DATABASE_NAME, result.stdout)
+
+
+class ImportTargetTest(unittest.TestCase):
+    """The rules themselves, in this process, where coverage can see them."""
+
+    def test_a_new_directory_is_accepted(self):
+        layout.check_target(support.workspace("layout") / "new")
+
+    def test_a_directory_of_an_earlier_import_is_accepted(self):
+        directory = support.workspace("layout")
+        (directory / layout.DATABASE_NAME).touch()
+        (directory / "metadata.yml").touch()
+        layout.check_target(directory)
+
+    def test_a_directory_with_unrelated_files_is_accepted(self):
+        """Such as the export itself: `import mine/Export.zip mine/`."""
+        directory = support.workspace("layout")
+        (directory / "Export.zip").touch()
+        layout.check_target(directory)
+
+    def test_an_existing_file_is_refused(self):
+        file = support.workspace("layout") / "notes"
+        file.touch()
+        with self.assertRaises(layout.UnusableDirectory):
+            layout.check_target(file)
+
+    def test_settings_without_a_database_are_refused(self):
+        directory = support.workspace("layout")
+        (directory / "settings.json").touch()
+        with self.assertRaises(layout.UnusableDirectory) as raised:
+            layout.check_target(directory)
+        self.assertIn("settings.json", str(raised.exception))
+
+    def test_the_view_command_quotes_only_what_needs_it(self):
+        self.assertEqual(layout.view_command("mine"), "datasette mine")
+        self.assertEqual(layout.view_command("my data"), 'datasette "my data"')
 
 
 class ConfigurationTest(unittest.TestCase):
     def test_the_bundled_configuration_ships_with_the_package(self):
-        """Inside the package, so `serve` works from an installed wheel too."""
-        directory = demo.config_dir()
+        """Inside the package, so `import` works from an installed wheel too."""
+        directory = layout.config_dir()
         self.assertEqual(directory.parent.name, "applehealth")
-        for name in demo.CONFIG_FILES:
+        for name in layout.CONFIG_FILES:
             self.assertTrue((directory / name).exists(), name)
 
     def test_prepare_refreshes_the_configuration(self):
-        target = support.workspace("demo") / "serving"
+        target = support.workspace("layout") / "serving"
         (stale := target / "metadata.yml").parent.mkdir(parents=True)
         stale.write_text("title: out of date\n")
 
-        demo.prepare(target)
+        layout.copy_configuration(target)
         self.assertEqual(
-            stale.read_text(), (demo.config_dir() / "metadata.yml").read_text()
+            stale.read_text(), (layout.config_dir() / "metadata.yml").read_text()
         )
 
 

@@ -140,35 +140,6 @@
       "problemMatcher": []
     },
     {
-      // Long-running: this one ends when you stop the server, so it keeps its
-      // own terminal and does not clear the output of the import that ran
-      // first. In the devcontainer, port 8001 is forwarded already.
-      "label": "poe demo",
-      "detail": "Synthesize an export, import it, and serve it",
-      "type": "shell",
-      "command": "poe",
-      "args": ["demo"],
-      "isBackground": true,
-      "presentation": {
-        "panel": "dedicated",
-        "clear": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "poe serve",
-      "detail": "Serve an already-built demo database",
-      "type": "shell",
-      "command": "poe",
-      "args": ["serve"],
-      "isBackground": true,
-      "presentation": {
-        "panel": "dedicated",
-        "clear": false
-      },
-      "problemMatcher": []
-    },
-    {
       // Goes to the network and rewrites committed files — read the diff
       // afterwards; it is Apple's documentation moving, not code.
       "label": "poe refresh-catalog",
@@ -180,7 +151,7 @@
     },
     {
       "label": "poe clean",
-      "detail": "Remove build artefacts, caches and the demo directory",
+      "detail": "Remove build artefacts and caches",
       "type": "shell",
       "command": "poe",
       "args": ["clean"],

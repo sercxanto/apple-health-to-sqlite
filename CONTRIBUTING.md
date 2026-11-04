@@ -35,7 +35,7 @@ pip install -e ".[dev]"
 
 If you prefer not to have a virtualenv, `pipx install poethepoet`,
 `pipx install datasette` and `pipx install ruff` give you the three commands
-the tasks call.
+the tasks and tests call.
 
 ## Commands
 
@@ -52,15 +52,19 @@ below with its description.
 | `poe lint` | `ruff check` and `ruff format --check` |
 | `poe format` | apply formatting and safe fixes |
 | `poe check` | lint + fast tests — what CI runs |
-| `poe demo` | synthesize an export, import it, serve it |
-| `poe serve` | serve an already-built demo database |
 | `poe refresh-catalog` | rebuild the catalogue from Apple's docs |
-| `poe clean` | remove build artefacts, caches and `demo/` |
+| `poe clean` | remove build artefacts and caches |
 
-Arguments after `--` reach the underlying command, so `poe demo -- --days 30`
-and `poe serve -- --port 9000` work. `demo` and `serve` are thin wrappers
-around `python3 -m applehealth demo` and `… serve`, which you can equally call
-directly.
+Arguments after `--` reach the underlying command, so
+`poe refresh-catalog -- --only categories` works.
+
+To look at the result, build a directory from invented data and open it:
+
+```bash
+python3 -m applehealth synthesize --days 120 export.zip
+python3 -m applehealth import export.zip sample/
+datasette sample/
+```
 
 There was a Makefile here until August 2026. It was replaced because half its
 recipes were Unix shell — `mkdir -p`, `cp`, `find -exec` — so none of it ran on
@@ -109,7 +113,7 @@ applehealth/
     derive.py       daily_metrics and the views
     dedup.py        folding several sources into one de-duplicated day
     synthetic.py    synthetic exports
-    demo.py         building a directory for Datasette, and serving it
+    layout.py       the directory an import writes for Datasette
     datasette/      metadata.yml and settings.json — facets, canned queries
 tasks.py            the development tasks poe calls
 tools/              development-time generators; not part of the package

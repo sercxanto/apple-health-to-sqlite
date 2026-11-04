@@ -26,8 +26,6 @@ dependencies = []
 dev = [
     "coverage>=7",
     "datasette>=0.65,<1",
-    "datasette-cluster-map",
-    "datasette-vega",
     "poethepoet>=0.24",
     "ruff>=0.6",
 ]
@@ -45,7 +43,7 @@ packages = [
 
 # The DTD lives inside the package so that it is importable both from a plain
 # checkout and from an installed wheel (see applehealth/dtd.py). The Datasette
-# configuration is there for the same reason: `serve` has to find it either
+# configuration is there for the same reason: `import` has to find it either
 # way, and so must the catalogue `derive` loads.
 [tool.setuptools.package-data]
 "applehealth.schema" = ["*.dtd", "*.md"]
@@ -55,7 +53,8 @@ packages = [
 # Task runner: `poe` with no arguments lists these. They replace a Makefile, so
 # they have to work on Windows too — no shell syntax, no `mkdir -p`, no `cp`.
 # Anything that runs Python is a `script` task in tasks.py, which explains why;
-# ruff is called directly. Extra arguments are passed on: `poe serve -- --port 9000`.
+# ruff is called directly. Extra arguments are passed on:
+# `poe refresh-catalog -- --only categories`.
 [tool.poe.tasks.test]
 help = "Run the fast test suite"
 script = "tasks:test"
@@ -94,20 +93,12 @@ sequence = [
 help = "Lint and fast tests — what CI runs, and what \"done\" means"
 sequence = ["lint", "test"]
 
-[tool.poe.tasks.demo]
-help = "Synthesize an export, import it, and serve it"
-script = "tasks:demo"
-
-[tool.poe.tasks.serve]
-help = "Serve an already-built demo database"
-script = "tasks:serve"
-
 [tool.poe.tasks.refresh-catalog]
 help = "Rebuild the category-value catalogue from Apple's documentation"
 script = "tasks:refresh_catalog"
 
 [tool.poe.tasks.clean]
-help = "Remove build artefacts, caches and the demo directory"
+help = "Remove build artefacts and caches"
 script = "tasks:clean"
 
 [tool.ruff]

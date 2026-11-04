@@ -17,15 +17,16 @@ import re
 import shutil
 import sqlite3
 import subprocess
+import sys
 import unittest
 from pathlib import Path
 
-from applehealth import demo
+from applehealth import layout
 
 from . import support
 
-# The same directory `serve` copies from, so this tests what is actually shipped.
-CONFIG_DIRECTORY = demo.config_dir()
+# The same directory `import` copies from, so this tests what is actually shipped.
+CONFIG_DIRECTORY = layout.config_dir()
 METADATA = CONFIG_DIRECTORY / "metadata.yml"
 SETTINGS = CONFIG_DIRECTORY / "settings.json"
 DATASETTE = shutil.which("datasette")
@@ -228,6 +229,41 @@ class MetadataQueryTest(unittest.TestCase):
         finally:
             connection.close()
         self.assertEqual(len(rows), len(ROUTE_POINTS))
+
+
+@unittest.skipIf(DATASETTE is None, "datasette is not installed")
+class ImportedDirectoryTest(unittest.TestCase):
+    """What `import` leaves behind opens with nothing but `datasette DIRECTORY`."""
+
+    def test_canned_queries_and_settings_apply_without_further_arguments(self):
+        directory = support.workspace("imported") / "mine"
+        subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "applehealth",
+                "import",
+                str(support.sample_export(days=6)),
+                str(directory),
+                "--quiet",
+            ],
+            check=True,
+        )
+
+        def get(path: str):
+            result = subprocess.run(
+                [DATASETTE, str(directory), "--get", path],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            return json.loads(result.stdout)
+
+        self.assertGreater(len(get("/health/steps_per_day.json?_shape=array")), 0)
+        self.assertEqual(
+            get("/-/settings.json")["sql_time_limit_ms"],
+            json.loads(SETTINGS.read_text())["sql_time_limit_ms"],
+        )
 
 
 @unittest.skipIf(DATASETTE is None, "datasette is not installed")

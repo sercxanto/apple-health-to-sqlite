@@ -8,7 +8,7 @@ with [Datasette](https://datasette.io), browse it as a website on your own
 machine.
 
 ```bash
-python3 -m applehealth import Export.zip health.db
+python3 -m applehealth import Export.zip mine/
 ```
 
 That is the whole setup. No runtime dependencies, nothing to install: a stock
@@ -43,7 +43,9 @@ workouts with routes — so you can look around before touching your own:
 
 ```bash
 pip install "datasette<1"      # the web interface; the importer needs nothing
-python3 -m applehealth demo
+python3 -m applehealth synthesize --days 120 export.zip
+python3 -m applehealth import export.zip sample/
+datasette sample/
 ```
 
 Then open <http://localhost:8001>.
@@ -52,15 +54,17 @@ Then open <http://localhost:8001>.
 
 1. On the iPhone: **Health → your profile picture → Export All Health Data**,
    and get the `Export.zip` onto your computer.
-2. Import it and serve it:
+2. Import it and open it:
 
    ```bash
-   python3 -m applehealth import Export.zip mine/health.db
-   python3 -m applehealth serve mine/
+   python3 -m applehealth import Export.zip mine/
+   datasette mine/
    ```
 
-A new export a few months later goes into the same database: re-importing is
-safe, rows you already have are skipped and new ones are added.
+The directory holds the database and Datasette's configuration, so that is all
+Datasette needs to be told. A new export a few months later goes into the same
+directory: re-importing is safe, rows you already have are skipped and new ones
+are added.
 
 ## Why this one
 
@@ -87,7 +91,7 @@ Export.zip` prints only the structure of your export and is safe to share.
 
 * [Commands](docs/commands.md) — every command and option
 * [Database layout](docs/database.md) — the tables, and what their numbers mean
-* [Datasette](docs/datasette.md) — serving, settings, plugins
+* [Datasette](docs/datasette.md) — opening the database, settings, plugins
 * [The export format](docs/schema.md) — Apple's schema and its traps
 * [Performance](docs/performance.md) — import and query timings
 

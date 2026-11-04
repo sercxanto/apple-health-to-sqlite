@@ -5,7 +5,6 @@
 export*.zip
 Export*.zip
 apple_health_export/
-demo/
 
 # Python
 __pycache__/

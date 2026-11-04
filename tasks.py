@@ -9,9 +9,7 @@ from here. Ruff is invoked as a `cmd` task, because `ruff` is `ruff`
 everywhere.
 
 Everything below therefore shells out through `sys.executable`, which by then
-is the interpreter poe resolved. The other half of the portability story is in
-`applehealth/demo.py`: the file shuffling `demo` and `serve` need is Python, not
-`mkdir -p` and `cp`.
+is the interpreter poe resolved.
 
 Not part of the package — pyproject.toml lists its packages explicitly, so this
 file is never installed.
@@ -27,9 +25,8 @@ from typing import NoReturn
 
 ROOT = Path(__file__).parent
 
-# Directories that are output, never source. `demo/` holds a synthesized export
-# and its database, both rebuildable with `poe demo`.
-ARTIFACTS = ("demo", "build", "dist", ".ruff_cache", "htmlcov")
+# Directories that are output, never source.
+ARTIFACTS = ("build", "dist", ".ruff_cache", "htmlcov")
 
 
 def _python(*arguments: str) -> NoReturn:
@@ -44,11 +41,11 @@ def _python(*arguments: str) -> NoReturn:
 
 
 def _extra_args() -> list[str]:
-    """Whatever followed the task name: `poe serve -- --port 9000`.
+    """Whatever followed the task name: `poe refresh-catalog -- --only categories`.
 
     The `--` keeps poe from claiming flags of its own (`-v` is poe's verbosity),
     and poe hands it on to us, so drop it before argparse sees it as its own
-    end-of-options marker and reads `--port` as a positional.
+    end-of-options marker and reads `--only` as a positional.
     """
     arguments = sys.argv[1:]
     return arguments[1:] if arguments[:1] == ["--"] else arguments
@@ -110,14 +107,6 @@ def coverage() -> None:
     raise SystemExit(tests.returncode or report.returncode)
 
 
-def demo() -> None:
-    _python("-m", "applehealth", "demo", *_extra_args())
-
-
-def serve() -> None:
-    _python("-m", "applehealth", "serve", *_extra_args())
-
-
 def refresh_catalog() -> None:
     """Rebuild `applehealth/catalog/` from Apple's HealthKit documentation.
 
@@ -129,7 +118,7 @@ def refresh_catalog() -> None:
 
 
 def clean() -> None:
-    """Remove build artefacts, caches and the demo directory."""
+    """Remove build artefacts and caches."""
     removed = []
     for name in ARTIFACTS:
         target = ROOT / name

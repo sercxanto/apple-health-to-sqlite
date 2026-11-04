@@ -11,7 +11,7 @@ import sys
 import textwrap
 from pathlib import Path
 
-from . import __version__, demo, dtd, pipeline, schema_tools, synthetic
+from . import __version__, dtd, layout, pipeline, schema_tools, synthetic
 from .archive import ExportNotFound
 from .importer import ImportOptions
 
@@ -29,36 +29,17 @@ def _wrapped(text: str, width: int = 76) -> str:
     )
 
 
-DEMO_DESCRIPTION = _wrapped(
+IMPORT_DESCRIPTION = _wrapped(
     f"""\
-Build a demonstration out of invented data, and serve it.
+Import an export into a directory that Datasette can open as it is.
 
-Creates DIRECTORY, synthesizes an export into it, imports that into
-DIRECTORY/{demo.DATABASE_NAME}, and serves the directory exactly as 'serve'
-does. No health data of yours is involved at any point.
+Creates DIRECTORY if necessary, creates or extends DIRECTORY/{layout.DATABASE_NAME}
+in it, and copies the bundled configuration ({" and ".join(layout.CONFIG_FILES)})
+next to the database, overwriting the copies of an earlier run. Afterwards,
+'datasette DIRECTORY' shows the database with its facets and canned queries.
 
-Everything under DIRECTORY is rebuildable output; 'poe clean' deletes it.\
-"""
-)
-
-SERVE_DESCRIPTION = _wrapped(
-    f"""\
-Serve a database that has already been built.
-
-Datasette is configured through a directory rather than through flags, so
-this assembles one: it copies the bundled configuration
-({" and ".join(demo.CONFIG_FILES)}) into DIRECTORY, overwriting whatever
-copies are already there, and then runs Datasette on the directory in the
-foreground until Ctrl-C. Edits of your own to those files do not survive a
-restart; make them in applehealth/datasette/, where the copies come from.
-
-The database has to be DIRECTORY/{demo.DATABASE_NAME}, under exactly that
-name: Datasette keys the canned queries in metadata.yml on the filename.
-Build one with 'demo', or import an export to that path yourself.
-
-Datasette is a development dependency and is never imported by this package;
-it runs as a subprocess, whether it lives in this environment (pip) or in one
-of its own (pipx).\
+Importing into the same directory again is safe: rows you already have are
+skipped and new ones are added.\
 """
 )
 
@@ -72,12 +53,18 @@ def build_parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command", required=True)
 
     importer = commands.add_parser(
-        "import", help="import an export into a SQLite database"
+        "import",
+        help="import an export into a directory Datasette can open",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=IMPORT_DESCRIPTION,
     )
     importer.add_argument(
         "export", help="Export.zip, an unpacked directory, or Export.xml"
     )
-    importer.add_argument("database", help="database to create or extend")
+    importer.add_argument(
+        "directory",
+        help=f"directory holding {layout.DATABASE_NAME}; created if missing",
+    )
     importer.add_argument(
         "--types",
         nargs="+",
@@ -137,45 +124,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     compare.add_argument("export")
 
-    demonstrate = commands.add_parser(
-        "demo",
-        help="synthesize an export, import it, and serve it",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        description=DEMO_DESCRIPTION,
-    )
-    demonstrate.add_argument(
-        "directory", nargs="?", default=demo.DEFAULT_DIRECTORY, help="where to build it"
-    )
-    demonstrate.add_argument(
-        "--days", type=int, default=120, help="how many days to invent"
-    )
-    demonstrate.add_argument(
-        "--port", type=int, default=demo.DEFAULT_PORT, help="port to serve on"
-    )
-    demonstrate.add_argument(
-        "--no-serve", action="store_true", help="build the database but do not serve it"
-    )
-
-    server = commands.add_parser(
-        "serve",
-        help="serve an already-built database with Datasette",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        description=SERVE_DESCRIPTION,
-    )
-    server.add_argument(
-        "directory",
-        nargs="?",
-        default=demo.DEFAULT_DIRECTORY,
-        help=f"directory holding {demo.DATABASE_NAME}",
-    )
-    server.add_argument(
-        "--port", type=int, default=demo.DEFAULT_PORT, help="port to serve on"
-    )
-
     return parser
 
 
 def command_import(args: argparse.Namespace) -> int:
+    layout.check_target(args.directory)
+    database = layout.database_path(args.directory)
     options = ImportOptions(
         types=tuple(args.types or ()),
         exclude_types=tuple(args.exclude_types or ()),
@@ -191,26 +145,30 @@ def command_import(args: argparse.Namespace) -> int:
 
     result = pipeline.run_import(
         args.export,
-        args.database,
+        str(database),
         options,
         on_progress=on_progress if options.progress else None,
     )
+    # After the import, so that a failed one leaves no configuration without a
+    # database, which the next run would have to refuse as somebody else's.
+    layout.copy_configuration(args.directory)
 
     if options.progress:
-        _report(args, result)
+        _report(args, database, result)
     return 0
 
 
-def _report(args: argparse.Namespace, result) -> None:
+def _report(args: argparse.Namespace, database: Path, result) -> None:
     print(
-        f"\nImported {args.export} into {args.database} "
+        f"\nImported {args.export} into {database} "
         f"in {result.elapsed_s:.1f}s (export version {result.version})"
     )
-    for table, count in pipeline.table_counts(args.database).items():
+    for table, count in pipeline.table_counts(str(database)).items():
         print(f"  {table:22} {count:>12,}")
     if result.routes_imported:
         print(f"  {'(gpx routes)':22} {result.routes_imported:>12,}")
-    print(f"\nDatabase size: {Path(args.database).stat().st_size / 1e6:.1f} MB")
+    print(f"\nDatabase size: {database.stat().st_size / 1e6:.1f} MB")
+    print(f"View it with: {layout.view_command(args.directory)}")
 
     if result.unhandled:
         print("\nElements without a handler (raw XML kept in table 'unhandled'):")
@@ -280,40 +238,11 @@ def command_schema_diff(args: argparse.Namespace) -> int:
     return 0
 
 
-def command_demo(args: argparse.Namespace) -> int:
-    # Before spending a minute building a database we cannot then show.
-    if not args.no_serve:
-        demo.require_datasette()
-
-    target = demo.prepare(args.directory)
-    export = target / "export.zip"
-    database = demo.database_path(target)
-
-    print(f"Synthesizing {args.days} days of invented data into {export}")
-    synthetic.synthesize(export, synthetic.SynthesizeOptions(days=args.days))
-    print(f"Importing into {database}")
-    result = pipeline.run_import(export, str(database), ImportOptions(progress=False))
-    print(
-        f"Imported {result.elapsed_s:.1f}s, "
-        f"{Path(database).stat().st_size / 1e6:.1f} MB"
-    )
-
-    if args.no_serve:
-        return 0
-    return demo.serve(target, args.port)
-
-
-def command_serve(args: argparse.Namespace) -> int:
-    return demo.serve(args.directory, args.port)
-
-
 COMMANDS = {
     "import": command_import,
     "synthesize": command_synthesize,
     "extract-schema": command_extract_schema,
     "schema-diff": command_schema_diff,
-    "demo": command_demo,
-    "serve": command_serve,
 }
 
 
@@ -325,7 +254,7 @@ def main(argv: list[str] | None = None) -> int:
         dtd.SchemaError,
         ExportNotFound,
         FileNotFoundError,
-        demo.DatasetteMissing,
+        layout.UnusableDirectory,
     ) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1

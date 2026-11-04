@@ -1,23 +1,26 @@
 # Datasette
 
-## Serving
+## Opening the database
+
+Datasette 0.65 is not part of this package and has to be installed separately
+(`pip install "datasette<1"`, or with pipx).
 
 ```bash
-python3 -m applehealth serve mine/
+python3 -m applehealth import Export.zip mine/
+datasette mine/
 ```
 
 Datasette is configured through a *configuration directory*: point it at a
 folder and it picks up `metadata.yml`, `settings.json` and every `*.db` in it,
-so nothing has to be repeated on the command line. `serve` copies the two
-bundled configuration files into the directory — overwriting any copies
-already there, so make lasting changes in `applehealth/datasette/` — and runs
-Datasette on it. Put the database there yourself, or let
-`python3 -m applehealth demo` build the whole directory from synthetic data.
+so nothing has to be repeated on the command line. `import` builds that folder:
+it writes `health.db` and copies the two bundled configuration files next to
+it. Every run overwrites those copies, so make lasting changes in
+`applehealth/datasette/`.
 
 The database file must be named `health.db`, since Datasette keys the
 configuration on the filename.
 
-Without `serve`, the equivalent is:
+Outside such a directory, the equivalent is:
 
 ```bash
 datasette health.db -m applehealth/datasette/metadata.yml --setting sql_time_limit_ms 10000
