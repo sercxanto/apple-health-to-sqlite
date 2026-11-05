@@ -108,11 +108,16 @@ is skipped on Windows.
 
 ## CI and dependency updates
 
-[.github/workflows/ci.yml](.github/workflows/ci.yml) runs the fast suite on Linux,
-macOS and Windows; lint, coverage and the slow test run on Linux only. Locally
-you usually see only one of those platforms, so a change that touches paths,
-file handling or text encodings needs a green run on all three: open a pull
-request instead of pushing to `main`.
+[.github/workflows/ci.yml](.github/workflows/ci.yml) runs the fast suite on Linux
+and Windows; lint, coverage and the slow test run on Linux only. Locally you
+usually see only one of those platforms, so a change that touches paths, file
+handling or text encodings needs a green run on both before it reaches `main`.
+
+While the repository is private, CI is reduced to save Actions minutes. Pull
+requests start nothing, so `poe check` is the only gate on them unless you start
+a run on the branch by hand (*Actions → CI → Run workflow*), and macOS is not
+tested at all. The top of the workflow says what to restore when the repository
+becomes public.
 
 The workflow pins each action to a commit hash, with its version in a comment,
 because a tag can be moved to other code. [Dependabot](.github/dependabot.yml)
