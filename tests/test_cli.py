@@ -22,19 +22,18 @@ def run(*arguments):
 
 
 class CommandNameTest(unittest.TestCase):
-    def test_the_command_is_installed_as_health2sqlite_and_under_the_package_name(self):
+    def test_the_command_is_installed_under_the_package_name_only(self):
         pyproject = Path(__file__).parent.parent / "pyproject.toml"
         project = tomllib.loads(pyproject.read_text("utf-8"))["project"]
-        entry_point = "apple_health_to_sqlite.cli:main"
         self.assertEqual(
             project["scripts"],
-            {"health2sqlite": entry_point, project["name"]: entry_point},
+            {project["name"]: "apple_health_to_sqlite.cli:main"},
         )
 
     def test_help_uses_the_name_people_type(self):
         result = run("--help")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertTrue(result.stdout.startswith("usage: health2sqlite"))
+        self.assertTrue(result.stdout.startswith("usage: apple-health-to-sqlite"))
 
 
 class SynthesizeCommandTest(unittest.TestCase):
