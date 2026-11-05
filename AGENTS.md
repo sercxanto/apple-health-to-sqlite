@@ -57,7 +57,7 @@ design decision to raise with the user, not something to work around quietly.
 
 ## Definition of done
 
-`poe check` passes — lint clean, fast suite green — and any behaviour you
+`poe check` passes — lint and types clean, fast suite green — and any behaviour you
 added has a test that fails without your change. If you touched the importer,
 the schema, or the database layout, also run `poe test-all`; invariants 3 and 4
 are only really exercised there.

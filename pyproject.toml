@@ -44,6 +44,7 @@ dev = [
     "datasette>=0.65,<1",
     "poethepoet>=0.24",
     "ruff>=0.6",
+    "ty>=0.0.98",
 ]
 
 [tool.setuptools]
@@ -66,7 +67,7 @@ packages = [
 # Task runner: `poe` with no arguments lists these. They replace a Makefile, so
 # they have to work on Windows too — no shell syntax, no `mkdir -p`, no `cp`.
 # Anything that runs Python is a `script` task in tasks.py, which explains why;
-# ruff is called directly. Extra arguments are passed on:
+# ruff and ty are called directly. Extra arguments are passed on:
 # `poe refresh-catalog -- --only categories`.
 [tool.poe.tasks.test]
 help = "Run the fast test suite"
@@ -95,6 +96,10 @@ sequence = [
     { cmd = "ruff format --check ." },
 ]
 
+[tool.poe.tasks.typecheck]
+help = "Check the type annotations of the package"
+cmd = "ty check"
+
 [tool.poe.tasks.format]
 help = "Apply formatting and safe lint fixes"
 sequence = [
@@ -103,8 +108,8 @@ sequence = [
 ]
 
 [tool.poe.tasks.check]
-help = "Lint and fast tests — what CI runs, and what \"done\" means"
-sequence = ["lint", "test"]
+help = "Lint, type check and fast tests — what CI runs, and what \"done\" means"
+sequence = ["lint", "typecheck", "test"]
 
 [tool.poe.tasks.refresh-catalog]
 help = "Rebuild the category-value catalogue from Apple's documentation"
@@ -113,6 +118,18 @@ script = "tasks:refresh_catalog"
 [tool.poe.tasks.clean]
 help = "Remove build artefacts and caches"
 script = "tasks:clean"
+
+# The package only: tests, tasks.py and tools/ handle fakes and raw data, where
+# types say little. All platforms, so that a branch for one operating system is
+# checked on the others too. Warnings fail the check, like every ruff finding.
+[tool.ty.src]
+include = ["apple_health_to_sqlite"]
+
+[tool.ty.environment]
+python-platform = "all"
+
+[tool.ty.terminal]
+error-on-warning = true
 
 [tool.ruff]
 line-length = 88

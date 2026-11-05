@@ -38,7 +38,7 @@
   "tasks": [
     {
       "label": "poe check",
-      "detail": "Lint and fast tests — what CI runs, and what \"done\" means",
+      "detail": "Lint, type check and fast tests — what CI runs, and what \"done\" means",
       "type": "shell",
       "command": "poe",
       "args": ["check"],
@@ -106,6 +106,15 @@
       "problemMatcher": []
     },
     {
+      "label": "poe coverage",
+      "detail": "Measure test coverage and enforce the gate (terminal + htmlcov/)",
+      "type": "shell",
+      "command": "poe",
+      "args": ["coverage"],
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
       "label": "poe lint",
       "detail": "Check formatting and lint rules",
       "type": "shell",
@@ -130,6 +139,14 @@
           }
         ]
       }
+    },
+    {
+      "label": "poe typecheck",
+      "detail": "Check the type annotations of the package",
+      "type": "shell",
+      "command": "poe",
+      "args": ["typecheck"],
+      "problemMatcher": []
     },
     {
       "label": "poe format",

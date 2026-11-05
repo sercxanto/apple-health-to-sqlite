@@ -21,6 +21,7 @@ import zipfile
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any
 from xml.sax.saxutils import quoteattr
 
 from . import catalog, dtd
@@ -637,7 +638,7 @@ class Synthesizer:
         # Real exports vary in which they populate, so do the same: every
         # fourth workout carries the statistics only, which is what exercises
         # the importer's fallback.
-        totals: dict[str, object] = {}
+        totals: dict[str, Any] = {}
         if index % 4:
             totals = {
                 "totalDistance": distance,

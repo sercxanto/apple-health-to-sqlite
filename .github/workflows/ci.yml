@@ -22,7 +22,8 @@ permissions:
 
 jobs:
   lint:
-    # Separate from the matrix: ruff gives the same answer on every platform.
+    # Separate from the matrix: ruff gives the same answer on every platform, and
+    # ty checks for all of them from this one.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -34,10 +35,12 @@ jobs:
       # --locked fails if uv.lock has fallen behind pyproject.toml.
       - name: Install
         run: uv sync --locked
-      # Through poe, so CI runs exactly what `poe lint` runs locally. The tasks
-      # live in pyproject.toml.
+      # Through poe, so CI runs exactly what `poe lint` and `poe typecheck` run
+      # locally. The tasks live in pyproject.toml.
       - name: Lint
         run: uv run poe lint
+      - name: Type check
+        run: uv run poe typecheck
 
   test:
     name: test (${{ matrix.os }}, Python ${{ matrix.python-version }})

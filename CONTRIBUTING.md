@@ -58,8 +58,9 @@ below with its description.
 | `poe test-slow` | only the slow large-export test — what the `slow` CI job runs |
 | `poe coverage` | fast suite under coverage; terminal summary + `htmlcov/`, fails under the gate |
 | `poe lint` | `ruff check` and `ruff format --check` |
+| `poe typecheck` | `ty check` on the package |
 | `poe format` | apply formatting and safe fixes |
-| `poe check` | lint + fast tests — what CI runs |
+| `poe check` | lint + type check + fast tests — what CI runs |
 | `poe refresh-catalog` | rebuild the catalogue from Apple's docs |
 | `poe clean` | remove build artefacts and caches |
 
@@ -109,7 +110,7 @@ is skipped on Windows.
 ## CI and dependency updates
 
 [.github/workflows/ci.yml](.github/workflows/ci.yml) runs the fast suite on Linux
-and Windows; lint, coverage and the slow test run on Linux only. Locally you
+and Windows; lint, type check, coverage and the slow test run on Linux only. Locally you
 usually see only one of those platforms, so a change that touches paths, file
 handling or text encodings needs a green run on both before it reaches `main`.
 
@@ -155,7 +156,9 @@ cycle. Start there when tracing what an import does.
 ## Conventions
 
 Formatting and lint rules are ruff's job, configured in `pyproject.toml`; run
-`poe format` rather than arguing about style. Beyond that:
+`poe format` rather than arguing about style. [ty](https://docs.astral.sh/ty/)
+checks the type annotations of the package; it is still in beta, so an update of
+it may report new findings. Beyond that:
 
 * **Names spell things out.** `correlation_id`, not `cid`. The exception is
   loop-local scratch in a two-line block.
@@ -170,6 +173,10 @@ Formatting and lint rules are ruff's job, configured in `pyproject.toml`; run
   do about it — compare `dtd.SchemaError` in `dtd.py`.
 * **Tests assert behaviour, not implementation.** Name them as sentences:
   `test_totals_are_backfilled_from_workout_statistics`.
+* **The README links with absolute URLs only.** It will also be the project
+  description on PyPI, where relative links and links to its own sections lead
+  nowhere. Other documents link relatively. `tests/test_docs.py` checks both, and
+  that every linked file and heading exists.
 
 ### Dependencies
 
@@ -180,7 +187,7 @@ happening.
 
 Dev-only dependencies are fine when they earn their place — currently
 `datasette` (the thing the output is for, and what validates `metadata.yml`),
-`ruff`, and `poethepoet` (the task runner, which is why there is no Makefile).
+`ruff`, `ty`, and `poethepoet` (the task runner, which is why there is no Makefile).
 To add one, say in the pull request what it does that the standard library
 cannot, and whether it is needed at runtime or only for development.
 Adding a runtime dependency needs a stronger case than convenience.

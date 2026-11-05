@@ -103,9 +103,11 @@ def device_name(device: str | None) -> str | None:
 
 
 def as_number(value: str | None) -> float | None:
+    if value is None:
+        return None
     try:
-        return float(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
+        return float(value)
+    except ValueError:
         return None
 
 
