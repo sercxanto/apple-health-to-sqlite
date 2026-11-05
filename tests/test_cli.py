@@ -293,5 +293,37 @@ class ParserTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
 
 
+class DefaultEncodingTest(unittest.TestCase):
+    def test_an_import_names_every_encoding_it_reads_and_writes(self):
+        """The default is UTF-8 on Linux and macOS, usually cp1252 on Windows.
+
+        So a forgotten `encoding=` passes everywhere it is likely to be tried
+        and only garbles text on Windows, and only once a file holds something
+        outside ASCII. Python can flag the call itself, on any platform.
+        """
+        export = support.workspace("encoding") / "Export.zip"
+        synthesize = run("synthesize", "--days", "2", "--quiet", str(export))
+        self.assertEqual(synthesize.returncode, 0, synthesize.stderr)
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-X",
+                "warn_default_encoding",
+                "-W",
+                "error::EncodingWarning",
+                "-m",
+                "apple_health_to_sqlite",
+                "import",
+                "--quiet",
+                str(export),
+                str(export.parent / "output"),
+            ],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()

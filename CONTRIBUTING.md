@@ -102,7 +102,23 @@ quietly counted.
 
 The slow test (`tests/test_large_export.py`) is skipped unless
 `APPLE_HEALTH_TO_SQLITE_SLOW_TESTS=1` is set. It synthesizes a few hundred thousand records
-and takes a minute or two; CI runs it once per push, not per Python version.
+and takes a minute or two; CI runs it once per push, on Linux, not per platform
+or Python version. Its memory check needs the POSIX-only `resource` module and
+is skipped on Windows.
+
+## CI and dependency updates
+
+[.github/workflows/ci.yml](.github/workflows/ci.yml) runs the fast suite on Linux,
+macOS and Windows; lint, coverage and the slow test run on Linux only. Locally
+you usually see only one of those platforms, so a change that touches paths,
+file handling or text encodings needs a green run on all three: open a pull
+request instead of pushing to `main`.
+
+The workflow pins each action to a commit hash, with its version in a comment,
+because a tag can be moved to other code. [Dependabot](.github/dependabot.yml)
+proposes updates of the actions and of the development dependencies in `uv.lock`
+once a month, each group in one pull request, and only for releases that are at
+least a week old.
 
 ## Layout
 

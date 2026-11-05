@@ -83,13 +83,13 @@ CREATE TABLE quantity_types (
 @lru_cache(maxsize=1)
 def load() -> dict[str, Any]:
     """The category catalogue as generated, cached for the life of the process."""
-    return json.loads(DATA_FILE.read_text())
+    return json.loads(DATA_FILE.read_text(encoding="utf-8"))
 
 
 @lru_cache(maxsize=1)
 def load_quantities() -> dict[str, Any]:
     """The quantity catalogue as generated, cached for the life of the process."""
-    return json.loads(QUANTITY_FILE.read_text())
+    return json.loads(QUANTITY_FILE.read_text(encoding="utf-8"))
 
 
 def install(connection: sqlite3.Connection) -> int:

@@ -14,7 +14,6 @@ What it guards:
 from __future__ import annotations
 
 import os
-import resource
 import shutil
 import sys
 import unittest
@@ -22,6 +21,13 @@ import unittest
 from apple_health_to_sqlite import synthetic
 
 from . import support
+
+# POSIX only. At the top of the module an unguarded import would fail the whole
+# suite on Windows, even though the tests that need it are skipped by default.
+try:
+    import resource
+except ImportError:
+    resource = None
 
 #: Peak resident memory allowed for the whole test process. The importer itself
 #: sits around 50 MB regardless of export size; the headroom is for the Python
@@ -58,6 +64,7 @@ class LargeExportTest(unittest.TestCase):
         count = support.one(self.database, "select count(*) from records")
         self.assertGreater(count, 300_000)
 
+    @unittest.skipIf(resource is None, "peak memory is measured on POSIX only")
     def test_memory_stayed_bounded(self):
         """The whole point of streaming the parse."""
         peak = peak_memory_mb()
