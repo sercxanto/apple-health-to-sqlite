@@ -18,7 +18,7 @@ this directory is a verbatim copy of it, used three ways:
 2. `tests/test_dtd.py` asserts that every declared element is handled by the
    importer, and `tests/test_synthetic.py` that every element which *can occur*
    is exercised.
-3. `health2sqlite schema-diff` compares a real export against it.
+3. `apple-health-to-sqlite schema-diff` compares a real export against it.
 
 ## Provenance
 

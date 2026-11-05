@@ -66,11 +66,11 @@ Datasette needs to be told. A new export a few months later goes into the same
 directory: re-importing is safe, rows you already have are skipped and new ones
 are added.
 
-To keep the command around instead of spelling it out each time:
+To keep the command around instead of going through uvx each time:
 
 ```bash
 uv tool install apple-health-to-sqlite
-health2sqlite import Export.zip mine/
+apple-health-to-sqlite import Export.zip mine/
 ```
 
 ## Why this one
