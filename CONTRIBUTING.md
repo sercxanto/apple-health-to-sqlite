@@ -110,17 +110,11 @@ is skipped on Windows.
 
 ## CI and dependency updates
 
-[.github/workflows/ci.yml](.github/workflows/ci.yml) runs the fast suite on Linux
-and Windows; lint, type check, coverage, the slow test and the test from the
-sdist run on Linux only. Locally you
-usually see only one of those platforms, so a change that touches paths, file
-handling or text encodings needs a green run on both before it reaches `main`.
-
-While the repository is private, CI is reduced to save Actions minutes. Pull
-requests start nothing, so `poe check` is the only gate on them unless you start
-a run on the branch by hand (*Actions → CI → Run workflow*), and macOS is not
-tested at all. The top of the workflow says what to restore when the repository
-becomes public.
+[.github/workflows/ci.yml](.github/workflows/ci.yml) runs the fast suite on Linux,
+macOS and Windows; lint, type check, coverage, the slow test and the test from the
+sdist run on Linux only. Locally you usually see only one of those platforms, so a
+change that touches paths, file handling or text encodings needs a green run on
+all three: open a pull request instead of pushing to `main`.
 
 The workflow pins each action to a commit hash, with its version in a comment,
 because a tag can be moved to other code. [Dependabot](.github/dependabot.yml)
@@ -317,14 +311,11 @@ trust the workflow through
 
 These settings live outside the repository, and only the maintainer can make them:
 
-1. Make the repository public, and restore the two lines marked `PRIVATE` in
-   [.github/workflows/ci.yml](.github/workflows/ci.yml). Wait for a green run: it
-   is the first one on macOS.
-2. On PyPI and on TestPyPI, add a pending trusted publisher for the project
+1. On PyPI and on TestPyPI, add a pending trusted publisher for the project
    `apple-health-to-sqlite`: owner `sercxanto`, repository
    `apple-health-to-sqlite`, workflow `release.yml`, and the environment `pypi`
    or `testpypi` respectively.
-3. On GitHub, create the environments `pypi` and `testpypi`, both limited to tags
+2. On GitHub, create the environments `pypi` and `testpypi`, both limited to tags
    `v*`. `pypi` gets the maintainer as required reviewer.
 
 ### Cutting release X.Y.Z
