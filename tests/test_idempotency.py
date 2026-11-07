@@ -7,9 +7,11 @@ is already there.
 
 from __future__ import annotations
 
+import sqlite3
 import unittest
 
 from apple_health_to_sqlite import synthetic
+from apple_health_to_sqlite.importer import UNHANDLED_LIMIT
 
 from . import support
 
@@ -99,6 +101,82 @@ class ReimportTest(unittest.TestCase):
             support.rows(first, "select id from records order by id limit 50"),
             support.rows(second, "select id from records order by id limit 50"),
         )
+
+
+class UnhandledIdentityTest(unittest.TestCase):
+    """A row in `unhandled` is identified by what it holds, like every other row."""
+
+    def import_all(self, *bodies):
+        database = support.workspace("db") / "health.db"
+        for body in bodies:
+            support.import_export(support.write_export(body), database=database)
+        return database
+
+    def stored(self, database):
+        return sorted(
+            row[0]
+            for row in support.rows(database, "select xml from unhandled order by id")
+        )
+
+    def test_the_same_element_is_stored_once_across_imports(self):
+        body = '<SomethingNew a="1"/>\n'
+        self.assertEqual(len(self.stored(self.import_all(body, body))), 1)
+
+    def test_a_different_element_at_the_same_position_is_not_lost(self):
+        database = self.import_all('<SomethingNew a="1"/>\n', '<SomethingNew a="2"/>\n')
+        stored = self.stored(database)
+        self.assertEqual(len(stored), 2)
+        self.assertIn('a="2"', stored[1])
+
+    def test_the_order_of_the_elements_does_not_matter(self):
+        database = self.import_all(
+            '<SomethingNew a="1"/>\n<AlsoNew b="1"/>\n',
+            '<AlsoNew b="1"/>\n<SomethingNew a="1"/>\n',
+        )
+        self.assertEqual(len(self.stored(database)), 2)
+
+    def test_the_whitespace_around_an_element_does_not_matter(self):
+        database = self.import_all(
+            '<SomethingNew a="1"/>\n', '  <SomethingNew a="1"/><AlsoNew b="1"/>'
+        )
+        self.assertEqual(len(self.stored(database)), 2)
+
+    def test_identical_elements_are_stored_once_and_counted_in_full(self):
+        database, result = support.import_export(
+            support.write_export('<SomethingNew a="1"/>\n' * 3)
+        )
+        self.assertEqual(len(self.stored(database)), 1)
+        self.assertEqual(result.unhandled, {"SomethingNew": 3})
+
+    def test_a_flood_of_one_element_does_not_crowd_out_another(self):
+        flood = "".join(
+            f'<SomethingNew a="{index}"/>\n' for index in range(UNHANDLED_LIMIT + 10)
+        )
+        database, result = support.import_export(
+            support.write_export(flood + '<AlsoNew b="1"/>\n')
+        )
+        self.assertEqual(
+            support.rows(
+                database,
+                "select tag, count(*) from unhandled group by tag order by tag",
+            ),
+            [("AlsoNew", 1), ("SomethingNew", UNHANDLED_LIMIT)],
+        )
+        self.assertEqual(result.unhandled["SomethingNew"], UNHANDLED_LIMIT + 10)
+
+    def test_rows_stored_under_the_old_ids_are_not_duplicated(self):
+        """0.1.0 numbered its rows, and a database from then is imported into."""
+        body = '<SomethingNew a="1"/>\n'
+        database = self.import_all(body)
+        connection = sqlite3.connect(database)
+        connection.execute(
+            "update unhandled set id = 12345, xml = ?", ('<SomethingNew a="1" />\n',)
+        )
+        connection.commit()
+        connection.close()
+
+        support.import_export(support.write_export(body), database=database)
+        self.assertEqual(len(self.stored(database)), 1)
 
 
 if __name__ == "__main__":

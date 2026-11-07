@@ -2,9 +2,23 @@
 
 from __future__ import annotations
 
+import sqlite3
 import unittest
 
 from . import support
+
+#: What `nightly_sleep` used to be, and still has to read for a single source.
+SUM_OF_SEGMENTS = """
+SELECT night_date,
+       round(sum(CASE WHEN stage LIKE 'Asleep%' THEN minutes END) / 60.0, 2),
+       round(sum(CASE WHEN stage = 'InBed' THEN minutes END) / 60.0, 2),
+       round(sum(CASE WHEN stage = 'AsleepDeep' THEN minutes END), 0),
+       round(sum(CASE WHEN stage = 'AsleepREM' THEN minutes END), 0),
+       round(sum(CASE WHEN stage = 'Awake' THEN minutes END), 0)
+FROM sleep_segments
+GROUP BY night_date
+ORDER BY night_date
+"""
 
 
 class DailyMetricsTest(unittest.TestCase):
@@ -269,6 +283,167 @@ class SleepViewTest(unittest.TestCase):
                 "select min_awake from nightly_sleep where night_date = '2026-08-01'",
             ),
             15.0,
+        )
+
+
+def sleep_record(source: str, stage: str, start: str, end: str) -> str:
+    return (
+        '<Record type="HKCategoryTypeIdentifierSleepAnalysis" '
+        f'sourceName="{source}" startDate="2026-03-{start} +0100" '
+        f'endDate="2026-03-{end} +0100" value="HKCategoryValueSleepAnalysis{stage}"/>\n'
+    )
+
+
+class SeveralSleepSourcesTest(unittest.TestCase):
+    """Two sources recording one night are one night's sleep, not two."""
+
+    COLUMNS = "hours_asleep, hours_in_bed, min_deep, min_rem, min_awake"
+
+    def night(self, *records):
+        database, _ = support.import_export(support.write_export("".join(records)))
+        return support.rows(
+            database, f"select night_date, {self.COLUMNS} from nightly_sleep"
+        )
+
+    def test_a_night_recorded_twice_counts_once(self):
+        self.assertEqual(
+            self.night(
+                sleep_record("Watch", "AsleepCore", "01 23:00:00", "02 07:00:00"),
+                sleep_record("SleepApp", "AsleepCore", "01 23:00:00", "02 07:00:00"),
+            ),
+            [("2026-03-01", 8.0, None, None, None, None)],
+        )
+
+    def test_sources_that_complement_each_other_add_up(self):
+        self.assertEqual(
+            self.night(
+                sleep_record("Watch", "AsleepCore", "01 23:00:00", "02 03:00:00"),
+                sleep_record("SleepApp", "AsleepCore", "02 03:00:00", "02 07:00:00"),
+            ),
+            [("2026-03-01", 8.0, None, None, None, None)],
+        )
+
+    def test_a_partial_overlap_counts_its_time_once(self):
+        self.assertEqual(
+            self.night(
+                sleep_record("Watch", "AsleepCore", "01 23:00:00", "02 05:00:00"),
+                sleep_record("SleepApp", "AsleepCore", "02 03:00:00", "02 07:00:00"),
+            ),
+            [("2026-03-01", 8.0, None, None, None, None)],
+        )
+
+    def test_in_bed_from_one_source_does_not_push_out_sleep_from_another(self):
+        """An iPhone often records only time in bed, and more of it than the
+        Watch records of sleep. They answer different questions."""
+        self.assertEqual(
+            self.night(
+                sleep_record("iPhone", "InBed", "01 22:30:00", "02 07:30:00"),
+                sleep_record("Watch", "AsleepCore", "01 23:00:00", "02 07:00:00"),
+            ),
+            [("2026-03-01", 8.0, 9.0, None, None, None)],
+        )
+
+    def test_the_stages_are_those_of_the_source_that_won(self):
+        self.assertEqual(
+            self.night(
+                sleep_record("Watch", "AsleepCore", "01 23:00:00", "02 05:00:00"),
+                sleep_record("Watch", "AsleepDeep", "02 05:00:00", "02 06:00:00"),
+                sleep_record("Watch", "AsleepREM", "02 06:00:00", "02 07:00:00"),
+                sleep_record(
+                    "SleepApp", "AsleepUnspecified", "02 00:00:00", "02 06:00:00"
+                ),
+            ),
+            [("2026-03-01", 8.0, None, 60.0, 60.0, None)],
+        )
+
+    def test_a_better_covered_source_keeps_its_stages_over_a_shorter_one(self):
+        self.assertEqual(
+            self.night(
+                sleep_record(
+                    "SleepApp", "AsleepUnspecified", "01 23:00:00", "02 07:00:00"
+                ),
+                sleep_record("Watch", "AsleepDeep", "02 01:00:00", "02 02:00:00"),
+            ),
+            [("2026-03-01", 8.0, None, None, None, None)],
+        )
+
+    def test_different_nights_may_have_different_winners(self):
+        database, _ = support.import_export(
+            support.write_export(
+                sleep_record("Watch", "AsleepCore", "01 23:00:00", "02 07:00:00")
+                + sleep_record("SleepApp", "AsleepCore", "02 23:00:00", "03 06:00:00")
+                + sleep_record("Watch", "AsleepCore", "02 23:00:00", "03 01:00:00")
+            )
+        )
+        self.assertEqual(
+            support.rows(
+                database,
+                "select night_date, hours_asleep from nightly_sleep order by 1",
+            ),
+            [("2026-03-01", 8.0), ("2026-03-02", 7.0)],
+        )
+
+    def test_the_segments_stay_as_recorded(self):
+        database, _ = support.import_export(
+            support.write_export(
+                sleep_record("Watch", "AsleepCore", "01 23:00:00", "02 07:00:00")
+                + sleep_record("SleepApp", "AsleepCore", "01 23:00:00", "02 07:00:00")
+            )
+        )
+        self.assertEqual(
+            support.one(database, "select count(*) from sleep_segments"), 2
+        )
+
+    def test_a_segment_without_a_readable_end_does_not_stop_the_import(self):
+        self.assertEqual(
+            self.night(
+                sleep_record("Watch", "AsleepCore", "01 23:00:00", "02 07:00:00"),
+                sleep_record(
+                    "SleepApp", "AsleepCore", "01 23:00:00", "02 07:00:00"
+                ).replace(
+                    'endDate="2026-03-02 07:00:00 +0100"', 'endDate="not a date"'
+                ),
+            ),
+            [("2026-03-01", 8.0, None, None, None, None)],
+        )
+
+    def test_a_database_with_the_old_view_is_upgraded(self):
+        """Up to 0.1.0, nightly_sleep was a view."""
+        export = support.write_export(
+            sleep_record("Watch", "AsleepCore", "01 23:00:00", "02 07:00:00")
+        )
+        database, _ = support.import_export(export)
+        connection = sqlite3.connect(database)
+        connection.executescript(
+            "drop table nightly_sleep;"
+            "create view nightly_sleep as select 1 as night_date;"
+        )
+        connection.close()
+
+        support.import_export(export, database=database)
+        self.assertEqual(
+            support.rows(
+                database, "select night_date, hours_asleep from nightly_sleep"
+            ),
+            [("2026-03-01", 8.0)],
+        )
+
+    def test_importing_twice_gives_the_same_nights(self):
+        export = support.write_export(
+            sleep_record("Watch", "AsleepCore", "01 23:00:00", "02 07:00:00")
+        )
+        database, _ = support.import_export(export)
+        support.import_export(export, database=database)
+        self.assertEqual(support.one(database, "select count(*) from nightly_sleep"), 1)
+
+    def test_a_single_source_reads_the_same_as_adding_up_its_segments(self):
+        database = support.sample_database()
+        self.assertEqual(
+            support.rows(
+                database,
+                f"select night_date, {self.COLUMNS} from nightly_sleep order by 1",
+            ),
+            support.rows(database, SUM_OF_SEGMENTS),
         )
 
 

@@ -8,12 +8,13 @@ its aggregates the metric actually means. `daily_metrics_by_source` keeps that
 same aggregation split by source, and `daily_metrics.deduplicated_value` (filled
 by `dedup`) folds several sources back into the one number the Health app shows,
 so a Watch and an iPhone recording the same steps do not read as twice as many.
+`nightly_sleep`, also from `dedup`, does the same for how much sleep a given
+*night* held (a night spans two calendar dates).
 
 The views exist because a few questions need SQL that is fiddly enough to be
 worth writing once: what a category record's value actually says, which sleep
-stage covered which minutes, how much sleep a given *night* held (a night spans
-two calendar dates), and what a workout looked like with its statistics folded
-back in.
+stage covered which minutes, and what a workout looked like with its statistics
+folded back in.
 """
 
 from __future__ import annotations
@@ -61,19 +62,6 @@ SELECT id, local_date, start_local, end_local,
        source_name
 FROM category_samples
 WHERE type = 'HKCategoryTypeIdentifierSleepAnalysis';
-
-DROP VIEW IF EXISTS nightly_sleep;
-CREATE VIEW nightly_sleep AS
-SELECT night_date,
-       round(sum(CASE WHEN stage LIKE 'Asleep%' THEN minutes END) / 60.0, 2)
-           AS hours_asleep,
-       round(sum(CASE WHEN stage = 'InBed' THEN minutes END) / 60.0, 2)
-           AS hours_in_bed,
-       round(sum(CASE WHEN stage = 'AsleepDeep' THEN minutes END), 0) AS min_deep,
-       round(sum(CASE WHEN stage = 'AsleepREM' THEN minutes END), 0) AS min_rem,
-       round(sum(CASE WHEN stage = 'Awake' THEN minutes END), 0) AS min_awake
-FROM sleep_segments
-GROUP BY night_date;
 
 DROP VIEW IF EXISTS workout_summary;
 CREATE VIEW workout_summary AS
@@ -202,6 +190,7 @@ def build(connection: sqlite3.Connection) -> int:
     # result, and before metric_summary — order among the rest does not matter,
     # but this one writes into a table the line above just built.
     dedup.build(connection)
+    dedup.build_nightly_sleep(connection)
     connection.execute("DROP TABLE IF EXISTS metric_summary")
     connection.execute(METRIC_SUMMARY)
     connection.execute(

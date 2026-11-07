@@ -53,6 +53,7 @@ def run_import(
 
             if options.routes:
                 result.routes_imported = routes.import_routes(importer, archive)
+            db.collapse_unhandled(connection)
 
             result.version = version
             result.schema_differences = dtd.diff(dtd.bundled(), schema)

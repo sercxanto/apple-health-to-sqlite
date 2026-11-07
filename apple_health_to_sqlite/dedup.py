@@ -20,17 +20,25 @@ import path and never replacing a raw number):
   complementary day — Watch all morning, iPhone all afternoon, little overlap —
   come back as the near-sum it should be, while a fully-overlapped day collapses
   to a single source.
+* **A sample with no span counts in full.** A glass of water logged at one instant
+  occupies no time, so nothing can overlap it. Two apps logging the same glass
+  therefore both count: the export cannot tell that from two different glasses.
 * **Only cumulative types are touched.** Averaging two sources' heart rates
   does not inflate anything, so discrete metrics keep `deduplicated_value` NULL.
 
 `total` stays the honest sum: for two apps logging genuinely different meals,
 the sum is the truth and this reconstruction is not. `deduplicated_value` is
 "what Health would show", offered beside it, never over it.
+
+`nightly_sleep` applies the same rules to the minutes of a night, with the sources
+ranked per night. `sleep_segments` keeps every source's segments as recorded.
 """
 
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Iterable
+from itertools import groupby
 
 # One sample as the sweep needs it: a half-open span [start, end) in epoch
 # seconds carrying a cumulative value, tagged with the source that recorded it.
@@ -68,7 +76,12 @@ def _overlap(span: Interval, region: list[Interval]) -> float:
 
 
 def deduplicated_value(samples: list[Sample]) -> float:
-    """The day's value with each instant credited to one source only.
+    """The day's value with each instant credited to one source only."""
+    return sum(credited_values(samples), start=0.0)
+
+
+def credited_values(samples: list[Sample]) -> list[float]:
+    """What each sample contributes once overlaps are settled, in the same order.
 
     Sources are ranked by how much of the day they cover; each source's
     *winning region* is its own coverage minus every higher-ranked source's,
@@ -77,19 +90,14 @@ def deduplicated_value(samples: list[Sample]) -> float:
     source's winning region — the whole value when it stands alone, none of it
     when a better source covers all of it, a slice when they overlap.
 
-    A sample whose end date could not be read has no span to compare, so nothing
+    A sample with no span — logged at one instant, or with an end date that could
+    not be read or lies before its start — has nothing to compare, so nothing
     shows it overlaps anything, and it counts in full.
     """
-    placed = [
-        (start, end, value, source)
-        for start, end, value, source in samples
-        if end is not None
-    ]
-    unplaced = sum(value for _start, end, value, _source in samples if end is None)
-
     by_source: dict[str, list[Interval]] = {}
-    for start, end, _value, source in placed:
-        by_source.setdefault(source, []).append((start, end))
+    for start, end, _value, source in samples:
+        if end is not None and end > start:
+            by_source.setdefault(source, []).append((start, end))
 
     coverage = {source: _union(spans) for source, spans in by_source.items()}
     # Best-covered source first; the name breaks ties so the result never
@@ -103,17 +111,12 @@ def deduplicated_value(samples: list[Sample]) -> float:
         winning[source] = _subtract(region, claimed)
         claimed = _union(claimed + region)
 
-    total = float(unplaced)
-    for start, end, value, source in placed:
-        span = end - start
-        if span <= 0:
-            # An instantaneous cumulative sample (rare): all or nothing, on
-            # whether its instant belongs to this source.
-            if _overlap((start, start + 1e-9), winning[source]) > 0:
-                total += value
-            continue
-        total += value * _overlap((start, end), winning[source]) / span
-    return total
+    return [
+        value * _overlap((start, end), winning[source]) / (end - start)
+        if end is not None and end > start
+        else value
+        for start, end, value, source in samples
+    ]
 
 
 def _subtract(region: list[Interval], claimed: list[Interval]) -> list[Interval]:
@@ -178,3 +181,91 @@ def build(connection: sqlite3.Connection) -> int:
         updates,
     )
     return len(updates)
+
+
+# A table rather than a view, because settling overlaps takes more than SQL. The
+# same columns and the same rounding as the sum over `sleep_segments` it replaces,
+# which it equals wherever one source recorded the night.
+_NIGHTLY_SLEEP = """
+CREATE TABLE nightly_sleep (
+    night_date TEXT PRIMARY KEY,
+    hours_asleep REAL, hours_in_bed REAL,
+    min_deep REAL, min_rem REAL, min_awake REAL
+)
+"""
+
+_INSERT_NIGHT = """
+INSERT INTO nightly_sleep VALUES (
+    ?, round(? / 60.0, 2), round(? / 60.0, 2), round(?, 0), round(?, 0), round(?, 0)
+)
+"""
+
+# Segments without a span in minutes have an unreadable date, and say nothing about
+# how long anyone slept.
+_NIGHT_SEGMENTS = """
+SELECT s.night_date, s.stage, r.start_ts, r.end_ts, s.minutes, s.source_name
+FROM sleep_segments s
+JOIN records r ON r.id = s.id
+WHERE s.night_date IS NOT NULL AND s.stage IS NOT NULL AND s.minutes IS NOT NULL
+ORDER BY s.night_date
+"""
+
+
+def _sleep_question(stage: str) -> str:
+    """Which question a stage answers; overlaps only count within one question.
+
+    Time in bed legitimately overlaps time asleep. An iPhone often records only
+    the former, and more of it than a Watch records of the latter, so ranking the
+    sources across everything would discard the Watch's sleep.
+    """
+    return "asleep" if stage.startswith("Asleep") else stage
+
+
+def _night_minutes(segments: Iterable[tuple]) -> dict[str, float]:
+    """Minutes per stage for one night, each moment credited to one source."""
+    questions: dict[str, list[tuple]] = {}
+    for segment in segments:
+        questions.setdefault(_sleep_question(segment[1]), []).append(segment)
+
+    minutes: dict[str, float] = {}
+    for members in questions.values():
+        credited = credited_values(
+            [(start, end, value, source) for _, _, start, end, value, source in members]
+        )
+        for (_, stage, *_rest), value in zip(members, credited, strict=True):
+            minutes[stage] = minutes.get(stage, 0.0) + value
+    return minutes
+
+
+def build_nightly_sleep(connection: sqlite3.Connection) -> int:
+    """(Re)build `nightly_sleep`, returning the number of nights.
+
+    A stage that won no time is NULL, the same as one nobody recorded.
+    """
+    # Up to 0.1.0 this was a view, and DROP refuses the wrong kind of object.
+    existing = connection.execute(
+        "SELECT type FROM sqlite_master WHERE name = 'nightly_sleep'"
+    ).fetchone()
+    if existing:
+        connection.execute(f"DROP {existing[0]} nightly_sleep")
+    connection.execute(_NIGHTLY_SLEEP)
+
+    nights = []
+    rows = connection.execute(_NIGHT_SEGMENTS)
+    for night_date, segments in groupby(rows, key=lambda row: row[0]):
+        minutes = _night_minutes(segments)
+        asleep = sum(
+            value for stage, value in minutes.items() if stage.startswith("Asleep")
+        )
+        nights.append(
+            (
+                night_date,
+                asleep or None,
+                minutes.get("InBed") or None,
+                minutes.get("AsleepDeep") or None,
+                minutes.get("AsleepREM") or None,
+                minutes.get("Awake") or None,
+            )
+        )
+    connection.executemany(_INSERT_NIGHT, nights)
+    return len(nights)

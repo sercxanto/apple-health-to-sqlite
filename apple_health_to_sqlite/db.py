@@ -222,6 +222,24 @@ def connect(path: str) -> sqlite3.Connection:
     return connection
 
 
+def collapse_unhandled(connection: sqlite3.Connection) -> None:
+    """Remove rows of `unhandled` that hold the same element twice.
+
+    Version 0.1.0 numbered these rows instead of hashing them, with the
+    whitespace after the element included, so importing into a database from
+    then stores each element again under its proper id. The table holds at most
+    a few thousand rows, so this costs nothing when there is nothing to do.
+    """
+    connection.execute(
+        """
+        DELETE FROM unhandled WHERE id NOT IN (
+            SELECT min(id) FROM unhandled
+            GROUP BY tag, trim(xml, ' ' || char(9, 10, 13))
+        )
+        """
+    )
+
+
 def create_indexes(connection: sqlite3.Connection) -> None:
     connection.executescript(INDEXES)
     connection.commit()

@@ -52,6 +52,44 @@ class DeduplicatedValueTest(unittest.TestCase):
         samples = [(0, 10, 100, "A"), (0, None, 7, "B")]
         self.assertEqual(deduplicated_value(samples), 107)
 
+    def test_samples_without_a_duration_add_up_across_sources(self):
+        """A glass of water logged at one instant overlaps nothing."""
+        instant = 1_780_000_000
+        samples = [
+            (instant, instant, 250, "A"),
+            (instant + 3600, instant + 3600, 500, "B"),
+        ]
+        self.assertEqual(deduplicated_value(samples), 750)
+
+    def test_a_sample_without_a_duration_counts_beside_timed_samples(self):
+        samples = [(0, 10, 100, "A"), (5, 5, 40, "A"), (5, 5, 7, "B")]
+        self.assertEqual(deduplicated_value(samples), 147)
+
+    def test_a_sample_ending_before_it_starts_counts_in_full(self):
+        samples = [(0, 10, 100, "A"), (20, 15, 7, "B")]
+        self.assertEqual(deduplicated_value(samples), 107)
+
+
+class SamplesWithoutDurationTest(unittest.TestCase):
+    def test_the_documented_query_shows_them_rather_than_zero(self):
+        record = (
+            '<Record type="HKQuantityTypeIdentifierDietaryWater" unit="mL" value="{value}" '
+            'sourceName="{source}" startDate="{time}" endDate="{time}"/>\n'
+        )
+        database, _ = support.import_export(
+            support.write_export(
+                record.format(value=250, source="A", time="2026-03-01 08:00:00 +0100")
+                + record.format(value=500, source="B", time="2026-03-01 18:00:00 +0100")
+            )
+        )
+        self.assertEqual(
+            support.one(
+                database,
+                "select coalesce(deduplicated_value, day_value) from daily_metrics",
+            ),
+            750.0,
+        )
+
 
 class UnreadableTimestampTest(unittest.TestCase):
     def test_a_bad_end_date_does_not_abort_the_import(self):

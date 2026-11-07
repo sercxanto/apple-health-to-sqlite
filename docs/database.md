@@ -30,14 +30,15 @@ daily_metrics           per metric and calendar day: n / total / mean / min / ma
                         and deduplicated_value where several sources overlap
 daily_metrics_by_source the same aggregation, split by source
 metric_summary          per metric, unit and source: sample count and date range
+nightly_sleep           per night: hours asleep and in bed, minutes per stage, with
+                        several sources settled to one; a night is named after the
+                        day you went to bed, and the boundary is noon
 category_types          what a category record's value means, and how Apple groups
 category_values         the value names themselves: Moderate, AsleepREM, …
 quantity_types          whether a metric's day adds up or averages out
 ```
 
-Views: `category_samples`, `symptoms`, `sleep_segments`, `nightly_sleep` (a
-night is named after the day you went to bed; the boundary is noon),
-`workout_summary`.
+Views: `category_samples`, `symptoms`, `sleep_segments`, `workout_summary`.
 
 Everything from `daily_metrics` downwards, and the views, is derived: it is
 rebuilt after every import unless you pass `--no-derived`.
@@ -82,6 +83,15 @@ samples that are only partly overlapped. A day where the Watch counted the
 morning and the iPhone the afternoon comes back as nearly the sum; a day where
 both counted everything comes back as one source's count. The ranking is per
 day, so switching devices does not throw off every day after the switch.
+
+A sample with no duration, such as a glass of water logged at one moment, cannot
+overlap anything and counts in full. So two apps logging the same glass both
+count: the export cannot tell that from two different glasses.
+
+`nightly_sleep` settles a night the same way, separately for time asleep, time in
+bed and time awake, because an iPhone recording time in bed says nothing against
+a Watch recording sleep. Minutes per stage come from whichever source won those
+minutes, and `sleep_segments` keeps every source's segments as recorded.
 
 This is a reconstruction, laid beside the raw numbers rather than replacing
 them: `total` and `day_value` stay the honest sum, which is the right answer

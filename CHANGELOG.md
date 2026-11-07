@@ -12,6 +12,10 @@ apple-health-to-sqlite follows
 - Exports of HealthKit version 17 are fully imported: time per workout zone is in the new tables `workout_zone_groups` and `workout_zones`, and `workout_records` says which records belong to which workout.
 - `schema-diff` shows the content and attributes of an element it does not know, not just its name.
 
+### Changed
+
+- `nightly_sleep` is now a table rather than a view, with the same columns. Queries that read it keep working.
+
 ### Fixed
 
 - Elements nested inside a known element could be lost without a word: version 17 workout zones were, and so was the metadata of correlations, workout events and workout routes. All of these are now imported, and anything unrecognised is kept in `unhandled` and reported at any depth, under a path such as `Workout/SomeNewElement`. To get the missing data, import your export again; existing rows stay as they are.
@@ -21,6 +25,9 @@ apple-health-to-sqlite follows
 - A record with an unreadable end date no longer aborts the import on a day with several sources.
 - A damaged export or workout route, a database the tool cannot use and a target it cannot write to now end in a message saying what to do, rather than a Python traceback. If a file in the export turns out to be damaged, nothing from that export reaches the database; before, a damaged route left the rest of the import in place without its derived tables.
 - `import --quiet` still reports elements it could not import and a differing schema, on stderr. Before, it said nothing about them.
+- `deduplicated_value` no longer drops samples without a duration, such as a glass of water logged at one moment. A day where two sources logged only such samples read 0. To get the right numbers, import your export again.
+- `nightly_sleep` counts a night recorded by several sources once, where it used to add them up. Importing your export again updates it; `sleep_segments` still shows every source.
+- A new unrecognised element is kept in `unhandled` even if an earlier import stored a different one in the same position, and the same element in another order is no longer stored twice. The limit of 500 stored rows now applies per element, so that one frequent element cannot leave no example of a rarer one.
 
 ## [0.1.0] - 2026-11-07
 

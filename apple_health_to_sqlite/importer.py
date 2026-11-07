@@ -86,7 +86,9 @@ CHILD_ELEMENTS = {
 #: every element declared in the bundled schema.
 HANDLED_ELEMENTS = HEADER_ELEMENTS.union(*CHILD_ELEMENTS.values())
 
-#: Cap on rows kept in `unhandled`; the counter keeps counting past it.
+#: Cap per tag and import on rows kept in `unhandled`, and the counter keeps
+#: counting past it. Per tag, so that a flood of one new element cannot use up
+#: the room for the single example of another.
 UNHANDLED_LIMIT = 500
 
 _DEVICE_NAME_RE = re.compile(r"name:([^,>]+)")
@@ -182,7 +184,6 @@ class Importer:
         self.result = ImportResult()
         self.buffers: dict[str, list[tuple]] = {}
         self.route_owners: dict[str, int] = {}
-        self._unhandled_stored = 0
 
         self._wanted_types: set[str] | None = None
         if self.options.types:
@@ -768,17 +769,13 @@ class Importer:
             self.report_unread(child, tag, f"{path}{tag}/")
 
     def handle_unknown(self, element, tag: str) -> None:
-        self.result.unhandled[tag] = self.result.unhandled.get(tag, 0) + 1
-        if self._unhandled_stored < UNHANDLED_LIMIT:
-            self._unhandled_stored += 1
-            self.add(
-                "unhandled",
-                (
-                    db.content_id(tag, self._unhandled_stored),
-                    tag,
-                    ElementTree.tostring(element, encoding="unicode")[:4000],
-                ),
-            )
+        seen = self.result.unhandled.get(tag, 0) + 1
+        self.result.unhandled[tag] = seen
+        if seen <= UNHANDLED_LIMIT:
+            # Stripped because the serialized form includes the whitespace after
+            # the element, which says where it stood and not what it is.
+            xml = ElementTree.tostring(element, encoding="unicode").strip()
+            self.add("unhandled", (db.content_id(tag, xml), tag, xml[:4000]))
 
     # -- main loop ---------------------------------------------------------
 

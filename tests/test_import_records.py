@@ -195,9 +195,10 @@ class UnknownElementTest(unittest.TestCase):
     def test_raw_xml_is_kept(self):
         stored = support.rows(self.database, "select tag, xml from unhandled")
         self.assertEqual(len(stored), 5)
-        self.assertIn("HKSomethingNew", stored[0][1])
+        everything = "".join(xml for _, xml in stored)
+        self.assertIn("HKSomethingNew", everything)
         # Children come along, so nothing about the element is lost.
-        self.assertIn("FutureDetail", "".join(xml for _, xml in stored))
+        self.assertIn("FutureDetail", everything)
 
 
 class SupportedVersionTest(unittest.TestCase):
