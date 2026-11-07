@@ -32,7 +32,7 @@ Datasette opens with nineteen ready-made questions, one click each:
 * What is actually in my export — which metrics, from which device, since
   when, and where are the gaps?
 
-<img src="docs/datasette-sleep.png" width="360" alt="Datasette showing a line chart of hours slept per night for ten nights, with a table of the same data below.">
+![Datasette showing a line chart of hours slept per night for ten nights, with a table of the same data below.](https://raw.githubusercontent.com/sercxanto/apple-health-to-sqlite/main/docs/datasette-sleep.png)
 
 (Sample data from `synthesize`, with the optional `datasette-vega` plugin for
 the chart.)
