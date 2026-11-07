@@ -17,8 +17,11 @@ can just ask for the export stream and the route files.
 from __future__ import annotations
 
 import os
+import xml.etree.ElementTree as ElementTree
 import zipfile
-from collections.abc import Iterator
+import zlib
+from collections.abc import Generator, Iterator
+from contextlib import AbstractContextManager, contextmanager
 from pathlib import Path
 from typing import IO
 
@@ -26,9 +29,18 @@ EXPORT_BASENAME = "export.xml"
 CDA_BASENAME = "export_cda.xml"
 ROUTES_DIRECTORY = "workout-routes"
 
+#: What reading a member raises when its bytes are not what they should be. The
+#: messages say where and how, never what the file contains, so they are safe to
+#: show and to paste into an issue.
+_DAMAGE_ERRORS = (ElementTree.ParseError, zipfile.BadZipFile, EOFError, zlib.error)
+
 
 class ExportNotFound(Exception):
     """Raised when an archive contains no recognisable `Export.xml`."""
+
+
+class DamagedExport(Exception):
+    """Raised when a file inside an export cannot be read to its end."""
 
 
 class ExportArchive:
@@ -104,11 +116,29 @@ class ExportArchive:
         # shadow the real one.
         return min(candidates, key=lambda name: (name.count("/"), len(name)))
 
-    def open_export(self) -> IO[bytes]:
+    def open_export(self) -> AbstractContextManager[IO[bytes]]:
         """Open the main XML file for streaming."""
         return self.open(self.export_member)
 
-    def open(self, member: str) -> IO[bytes]:
+    @contextmanager
+    def open(self, member: str) -> Generator[IO[bytes]]:
+        """Open a member for streaming, for use in a `with` block.
+
+        A context manager because damage only shows while the file is being read,
+        by whatever is reading it. Here is the one place that knows which file
+        that was, and it covers every reader at once.
+        """
+        try:
+            with self._open_stream(member) as stream:
+                yield stream
+        except _DAMAGE_ERRORS as error:
+            raise DamagedExport(
+                f"Cannot read {member} from {self.path} ({error}). The export is "
+                f"incomplete or damaged. Export it again from the Health app and "
+                f"import the new file."
+            ) from error
+
+    def _open_stream(self, member: str) -> IO[bytes]:
         if self._single_file is not None:
             return open(self._single_file, "rb")
         if self._zip is not None:

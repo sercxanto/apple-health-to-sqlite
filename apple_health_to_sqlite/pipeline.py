@@ -9,6 +9,8 @@ from __future__ import annotations
 import os
 import sqlite3
 import time
+from collections.abc import Generator
+from contextlib import contextmanager
 from pathlib import Path
 
 from . import db, derive, dtd, routes
@@ -40,31 +42,49 @@ def run_import(
 
         # Only now, so a mistyped export path leaves no stray directory behind.
         Path(database_path).parent.mkdir(parents=True, exist_ok=True)
-        connection = db.connect(database_path)
-        importer = Importer(connection, options)
+        with _open_database(database_path) as connection:
+            importer = Importer(connection, options)
 
-        with archive.open_export() as stream:
-            result = importer.parse(stream, on_progress=on_progress)
-        connection.commit()
+            # The export and its routes are one transaction, committed by
+            # `_write_export_meta`: a file that turns out to be damaged halfway
+            # through then leaves the database as it was, not half updated.
+            with archive.open_export() as stream:
+                result = importer.parse(stream, on_progress=on_progress)
 
-        if options.routes:
-            result.routes_imported = routes.import_routes(importer, archive)
+            if options.routes:
+                result.routes_imported = routes.import_routes(importer, archive)
+
+            result.version = version
+            result.schema_differences = dtd.diff(dtd.bundled(), schema)
+            _write_export_meta(connection, os.fspath(export_path), result)
+
+            db.create_indexes(connection)
+            if options.derived:
+                derive.build(connection)
+            connection.execute("ANALYZE")
             connection.commit()
-
-        result.version = version
-        result.schema_differences = dtd.diff(dtd.bundled(), schema)
-        _write_export_meta(connection, os.fspath(export_path), result)
-
-    db.create_indexes(connection)
-    if options.derived:
-        derive.build(connection)
-    connection.execute("ANALYZE")
-    connection.commit()
-    connection.close()
     # Report the whole run, not just the XML parse: indexes and derived tables
     # are a third of it on a large export.
     result.elapsed_s = time.monotonic() - started
     return result
+
+
+@contextmanager
+def _open_database(database_path: str) -> Generator[sqlite3.Connection]:
+    """A connection that is always closed, which rolls back what is uncommitted."""
+    try:
+        connection = db.connect(database_path)
+        try:
+            yield connection
+        finally:
+            connection.close()
+    except sqlite3.Error as error:
+        raise db.UnusableDatabase(
+            f"Cannot use {database_path} ({error}). If another program has it "
+            f"open, close that and try again. If the file comes from another "
+            f"version of this tool or from somewhere else, import into a new "
+            f"directory."
+        ) from error
 
 
 def _write_export_meta(

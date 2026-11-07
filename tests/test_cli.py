@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import sqlite3
 import subprocess
 import sys
 import tomllib
 import unittest
+import zipfile
 from pathlib import Path
 
 from apple_health_to_sqlite import layout
@@ -72,6 +74,32 @@ class ImportCommandTest(unittest.TestCase):
         result = run("import", str(self.export), str(directory), "--quiet")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, "")
+
+    def test_quiet_says_nothing_about_a_clean_import(self):
+        directory = support.workspace("cli")
+        result = run("import", str(self.export), str(directory), "--quiet")
+        self.assertEqual(result.stderr, "")
+
+    def test_quiet_still_reports_what_was_not_imported(self):
+        export = support.write_export('<SomethingNew a="1"/>\n')
+        directory = support.workspace("cli")
+        result = run("import", str(export), str(directory), "--quiet")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("SomethingNew", result.stderr)
+
+    def test_quiet_still_reports_a_different_schema(self):
+        export = support.write_export("", version=99)
+        directory = support.workspace("cli")
+        result = run("import", str(export), str(directory), "--quiet")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("schema-diff", result.stderr)
+
+    def test_the_summary_still_reports_what_was_not_imported(self):
+        export = support.write_export('<SomethingNew a="1"/>\n')
+        directory = support.workspace("cli")
+        result = run("import", str(export), str(directory))
+        self.assertIn("SomethingNew", result.stdout)
 
     def test_filters_are_wired_through(self):
         directory = support.workspace("cli")
@@ -288,6 +316,106 @@ class ConfigurationTest(unittest.TestCase):
         layout.copy_configuration(target)
         self.assertEqual(
             stale.read_text(), (layout.config_dir() / "metadata.yml").read_text()
+        )
+
+
+def damage_first_member(path: Path) -> None:
+    """Flip bytes in the middle of the first compressed file of a zip."""
+    with zipfile.ZipFile(path) as archive:
+        info = archive.infolist()[0]
+    data = bytearray(path.read_bytes())
+    start = info.header_offset + 30 + len(info.filename.encode()) + len(info.extra)
+    middle = start + info.compress_size // 2
+    data[middle] ^= 0xFF
+    data[middle + 1] ^= 0xFF
+    path.write_bytes(bytes(data))
+
+
+class FailureTest(unittest.TestCase):
+    """What goes wrong on a real machine ends in a sentence, not a traceback."""
+
+    def assert_explained(self, result, *expected):
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+        self.assertTrue(result.stderr.startswith("error: "), result.stderr)
+        for text in expected:
+            self.assertIn(text, result.stderr)
+
+    def test_a_truncated_export(self):
+        export = support.workspace("cli") / "Export.xml"
+        export.write_text(support.wrap_body("")[:-20], encoding="utf-8")
+        result = run("import", str(export), str(support.workspace("cli")))
+        self.assert_explained(result, "Export.xml", "damaged")
+
+    def test_a_damaged_zip(self):
+        export = support.write_export("")
+        damage_first_member(export)
+        result = run("import", str(export), str(support.workspace("cli")))
+        self.assert_explained(result, "damaged")
+
+    def test_a_damaged_zip_with_the_schema_commands(self):
+        export = support.write_export("")
+        damage_first_member(export)
+        for command in ("schema-diff", "extract-schema"):
+            with self.subTest(command=command):
+                self.assert_explained(run(command, str(export)), "damaged")
+
+    def test_a_damaged_route_names_the_file_and_changes_nothing(self):
+        directory = support.workspace("cli")
+        run("import", str(support.write_export("")), str(directory), "--quiet")
+
+        export = support.export_from_fixture(
+            "workouts", routes={"route_a.gpx": "<gpx><trk>"}
+        )
+        result = run("import", str(export), str(directory))
+
+        self.assert_explained(result, "route_a.gpx", "damaged")
+        self.assertEqual(
+            support.one(directory / "health.db", "select count(*) from workouts"), 0
+        )
+
+    def test_the_import_works_again_after_a_failed_one(self):
+        directory = support.workspace("cli")
+        broken = support.workspace("cli") / "Export.xml"
+        broken.write_text(support.wrap_body("")[:-20], encoding="utf-8")
+        run("import", str(broken), str(directory))
+
+        result = run(
+            "import", str(support.export_from_fixture("workouts")), str(directory)
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertGreater(
+            support.one(directory / "health.db", "select count(*) from workouts"), 0
+        )
+
+    def test_a_database_with_another_layout(self):
+        directory = support.workspace("cli")
+        connection = sqlite3.connect(directory / "health.db")
+        connection.execute("create table records (id integer primary key, type text)")
+        connection.commit()
+        connection.close()
+        export = support.write_export(
+            '<Record type="HKQuantityTypeIdentifierStepCount" sourceName="Watch" '
+            'startDate="2026-03-01 08:00:00 +0100" '
+            'endDate="2026-03-01 08:10:00 +0100" value="1"/>\n'
+        )
+        result = run("import", str(export), str(directory))
+        self.assert_explained(result, "health.db", "new directory")
+
+    def test_a_file_that_is_not_a_database(self):
+        directory = support.workspace("cli")
+        (directory / "health.db").write_text("not a database, sorry\n" * 100)
+        result = run("import", str(support.write_export("")), str(directory))
+        self.assert_explained(result, "health.db", "new directory")
+
+    def test_a_target_that_cannot_be_written(self):
+        directory = support.workspace("cli")
+        export = support.write_export("")
+        run("import", str(export), str(directory), "--quiet")
+        (directory / "metadata.yml").unlink()
+        (directory / "metadata.yml").mkdir()
+        self.assert_explained(
+            run("import", str(export), str(directory)), "metadata.yml"
         )
 
 

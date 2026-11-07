@@ -206,11 +206,19 @@ CREATE INDEX IF NOT EXISTS idx_workouts_activity ON workouts (activity_short);
 BATCH_SIZE = 5000
 
 
+class UnusableDatabase(Exception):
+    """Raised when SQLite refuses the database an import is writing to."""
+
+
 def connect(path: str) -> sqlite3.Connection:
     """Open the database with settings tuned for a bulk import."""
     connection = sqlite3.connect(path)
-    connection.executescript("PRAGMA journal_mode=WAL; PRAGMA synchronous=OFF;")
-    connection.executescript(SCHEMA)
+    try:
+        connection.executescript("PRAGMA journal_mode=WAL; PRAGMA synchronous=OFF;")
+        connection.executescript(SCHEMA)
+    except sqlite3.Error:
+        connection.close()
+        raise
     return connection
 
 
