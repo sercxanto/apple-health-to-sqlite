@@ -32,6 +32,11 @@ Datasette opens with nineteen ready-made questions, one click each:
 * What is actually in my export — which metrics, from which device, since
   when, and where are the gaps?
 
+<img src="docs/datasette-sleep.png" width="360" alt="Datasette showing a line chart of hours slept per night for ten nights, with a table of the same data below.">
+
+(Sample data from `synthesize`, with the optional `datasette-vega` plugin for
+the chart.)
+
 And because it is plain SQLite, anything else is one query away:
 
 ```sql
