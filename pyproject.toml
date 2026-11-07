@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "apple-health-to-sqlite"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Convert an Apple Health export (HealthKit export version 14+) to SQLite, ready for Datasette"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -29,6 +29,7 @@ dependencies = []
 [project.urls]
 Homepage = "https://github.com/sercxanto/apple-health-to-sqlite"
 Issues = "https://github.com/sercxanto/apple-health-to-sqlite/issues"
+Changelog = "https://github.com/sercxanto/apple-health-to-sqlite/blob/main/CHANGELOG.md"
 
 # Named like the package because uvx looks for a command of that name, so that
 # `uvx apple-health-to-sqlite import ...` works without `--from`.
@@ -46,6 +47,11 @@ dev = [
     "ruff>=0.6",
     "ty>=0.0.98",
 ]
+
+# The version lives in `__version__`, where `--version` needs it anyway, and
+# changes only in a release commit (CONTRIBUTING.md, section "Releasing").
+[tool.setuptools.dynamic]
+version = { attr = "apple_health_to_sqlite.__version__" }
 
 [tool.setuptools]
 packages = [
@@ -84,6 +90,10 @@ env = { APPLE_HEALTH_TO_SQLITE_SLOW_TESTS = "1" }
 help = "Run only the slow large-export test"
 script = "tasks:test_slow"
 env = { APPLE_HEALTH_TO_SQLITE_SLOW_TESTS = "1" }
+
+[tool.poe.tasks.test-sdist]
+help = "Build the sdist and run the fast test suite from it"
+script = "tasks:test_sdist"
 
 [tool.poe.tasks.coverage]
 help = "Measure test coverage and enforce the gate (terminal + htmlcov/)"

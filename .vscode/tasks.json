@@ -106,6 +106,15 @@
       "problemMatcher": []
     },
     {
+      "label": "poe test-sdist",
+      "detail": "Build the sdist and run the fast test suite from it",
+      "type": "shell",
+      "command": "poe",
+      "args": ["test-sdist"],
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
       "label": "poe coverage",
       "detail": "Measure test coverage and enforce the gate (terminal + htmlcov/)",
       "type": "shell",

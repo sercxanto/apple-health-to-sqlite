@@ -62,6 +62,9 @@ added has a test that fails without your change. If you touched the importer,
 the schema, or the database layout, also run `poe test-all`; invariants 3 and 4
 are only really exercised there.
 
+A change users can notice also adds an entry under `## [Unreleased]` in
+CHANGELOG.md, written for them: what they notice, not how it was built.
+
 Report honestly: if something is untested, unfinished, or you worked around a
 failure rather than fixing it, say so plainly rather than letting `poe check`
 speak for work it did not cover.

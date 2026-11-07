@@ -20,6 +20,8 @@ from __future__ import annotations
 import shutil
 import subprocess
 import sys
+import tarfile
+import tempfile
 from pathlib import Path
 from typing import NoReturn
 
@@ -58,6 +60,33 @@ def test() -> None:
 def test_slow() -> None:
     """Only the large-export test — what the `slow` CI job runs."""
     _python("-m", "unittest", "tests.test_large_export", "-v")
+
+
+def test_sdist() -> None:
+    """Build the sdist and run the fast suite from what is unpacked out of it.
+
+    A file the suite needs and MANIFEST.in leaves out fails here, and nowhere
+    else before a release. The directory is the current one for the tests and
+    the command lines they start, so they find the unpacked package first, not
+    the checkout the environment has installed.
+
+    Needs uv on the PATH, which everything in this repository already assumes.
+    """
+    with tempfile.TemporaryDirectory() as temporary:
+        directory = Path(temporary)
+        subprocess.run(
+            ["uv", "build", "--sdist", "--out-dir", str(directory)],
+            cwd=ROOT,
+            check=True,
+        )
+        sdist = next(directory.glob("*.tar.gz"))
+        with tarfile.open(sdist) as archive:
+            archive.extractall(directory, filter="data")
+        completed = subprocess.run(
+            [sys.executable, "-m", "unittest", "discover", "-s", "tests", "-t", "."],
+            cwd=directory / sdist.name.removesuffix(".tar.gz"),
+        )
+    raise SystemExit(completed.returncode)
 
 
 def coverage() -> None:

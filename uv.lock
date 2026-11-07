@@ -26,7 +26,6 @@ wheels = [
 
 [[package]]
 name = "apple-health-to-sqlite"
-version = "0.1.0"
 source = { editable = "." }
 
 [package.dev-dependencies]

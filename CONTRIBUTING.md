@@ -56,6 +56,7 @@ below with its description.
 | `poe test` | fast test suite (a few seconds) |
 | `poe test-all` | everything, including the slow large-export test |
 | `poe test-slow` | only the slow large-export test — what the `slow` CI job runs |
+| `poe test-sdist` | build the sdist and run the fast suite from it |
 | `poe coverage` | fast suite under coverage; terminal summary + `htmlcov/`, fails under the gate |
 | `poe lint` | `ruff check` and `ruff format --check` |
 | `poe typecheck` | `ty check` on the package |
@@ -110,7 +111,8 @@ is skipped on Windows.
 ## CI and dependency updates
 
 [.github/workflows/ci.yml](.github/workflows/ci.yml) runs the fast suite on Linux
-and Windows; lint, type check, coverage and the slow test run on Linux only. Locally you
+and Windows; lint, type check, coverage, the slow test and the test from the
+sdist run on Linux only. Locally you
 usually see only one of those platforms, so a change that touches paths, file
 handling or text encodings needs a green run on both before it reaches `main`.
 
@@ -146,7 +148,7 @@ apple_health_to_sqlite/
     layout.py       the directory an import writes for Datasette
     datasette/      metadata.yml and settings.json — facets, canned queries
 tasks.py            the development tasks poe calls
-tools/              development-time generators; not part of the package
+tools/              development-time scripts; not part of the package
 tests/              unittest suite; tests/fixtures/*.xml are hand-written
 ```
 
@@ -282,6 +284,89 @@ Two sources, both synthetic:
 If you hit a bug that only your real export triggers, reproduce it as a
 fixture: reduce it to the structure that breaks, replace the values with
 obviously fake ones, and commit *that*.
+
+## Releasing
+
+Versions follow [Semantic Versioning](https://semver.org). The version is
+`__version__` in `apple_health_to_sqlite/__init__.py`, and it changes only in a
+release commit; between releases, `main` carries the version of the last
+release. While the version is 0.x, a change that breaks the command line or the
+database layout raises the minor version, everything else the patch version.
+
+[CHANGELOG.md](CHANGELOG.md) follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/): `## [Unreleased]` first,
+then `## [X.Y.Z] - YYYY-MM-DD` for each release, newest first, with entries under
+`### Added`, `### Changed`, `### Deprecated`, `### Removed`, `### Fixed` and
+`### Security`. Link references end the file. A change that users can notice adds
+an entry under `Unreleased`, written for them.
+[tools/release.py](tools/release.py) parses the file, and
+`tests/test_release.py` checks its structure.
+
+Pushing a tag `vX.Y.Z` starts
+[.github/workflows/release.yml](.github/workflows/release.yml). It checks that the
+tagged commit is on `main` and that the tag, `__version__` and the changelog agree,
+runs all CI jobs on that commit, builds the sdist and the wheel once, and tries the
+wheel on Linux, macOS and Windows: `--version`, then an import of invented data.
+Then it publishes the same files to TestPyPI, waits for the maintainer to approve
+the deployment to PyPI, publishes them there, and creates a GitHub Release with the
+changelog section as its notes. Neither index holds a token for this project: they
+trust the workflow through
+[Trusted Publishing](https://docs.pypi.org/trusted-publishers/).
+
+### Before the first release
+
+These settings live outside the repository, and only the maintainer can make them:
+
+1. Make the repository public, and restore the two lines marked `PRIVATE` in
+   [.github/workflows/ci.yml](.github/workflows/ci.yml). Wait for a green run: it
+   is the first one on macOS.
+2. On PyPI and on TestPyPI, add a pending trusted publisher for the project
+   `apple-health-to-sqlite`: owner `sercxanto`, repository
+   `apple-health-to-sqlite`, workflow `release.yml`, and the environment `pypi`
+   or `testpypi` respectively.
+3. On GitHub, create the environments `pypi` and `testpypi`, both limited to tags
+   `v*`. `pypi` gets the maintainer as required reviewer.
+
+### Cutting release X.Y.Z
+
+1. In CHANGELOG.md, move the entries under `Unreleased` into a new section
+   `## [X.Y.Z] - <today>` below it, point the link reference `[Unreleased]` to
+   `compare/vX.Y.Z...HEAD`, and add `[X.Y.Z]` pointing to `releases/tag/vX.Y.Z`.
+   Set `__version__` to `"X.Y.Z"`.
+2. Dry run:
+
+   ```bash
+   python3 tools/release.py check vX.Y.Z
+   poe test-sdist
+   uv build --clear
+   uvx twine check --strict dist/*
+   ```
+
+3. Commit as "Release X.Y.Z", push to `main` and wait until CI is green.
+4. Tag and push the tag:
+
+   ```bash
+   git tag -a vX.Y.Z -m "X.Y.Z"
+   git push origin vX.Y.Z
+   ```
+
+5. In the run of the release workflow (*Actions → release*), once "publish to
+   TestPyPI" has finished, look at the version's page on TestPyPI. Then approve the
+   deployment to `pypi` (*Review deployments*). Nothing on PyPI can be uploaded
+   again, so this is the last point to stop.
+6. Check the version's page on PyPI and the GitHub Release.
+
+A version number is never reused, and a tag that was published is never moved. A
+bad release is yanked on PyPI and followed by a patch release. After a failed run:
+
+* **Before "publish to TestPyPI"** (the check, the tests, the build or the smoke
+  test): fix the cause in a new commit, delete the tag and create it again on that
+  commit. The version stays the same.
+* **From "publish to TestPyPI" on, a rejected approval included:** the version is
+  used up, because TestPyPI, like PyPI, accepts each file name only once. Release
+  the fix as the next patch version, with the changelog section renamed to it.
+* **After "publish to PyPI", in the GitHub Release:** re-run the failed job; it
+  uses the same files.
 
 ## Pull requests
 

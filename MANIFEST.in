@@ -1,0 +1,14 @@
+# What the sdist carries beyond the package: enough to run the test suite from it
+# (`poe test-sdist`), including the documents and files that suite checks.
+include AGENTS.md CHANGELOG.md CLAUDE.md CONTRIBUTING.md
+include tasks.py uv.lock
+graft .github
+graft docs
+graft tests
+graft tools
+
+# setuptools does not read .gitignore, and this repository's .gitignore is what
+# keeps health data out of it. Say it again here, so that a stray export or
+# database in one of the directories above cannot end up in a published file.
+global-exclude *.zip *.db *.db-wal *.db-shm *.gpx
+global-exclude *.py[cod]
