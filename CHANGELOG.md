@@ -7,6 +7,8 @@ apple-health-to-sqlite follows
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-07
+
 ### Added
 
 - `apple-health-to-sqlite import` turns an Apple Health export (HealthKit export version 14 or newer) into a SQLite database, in a directory that also holds the configuration for browsing it with Datasette.
@@ -15,6 +17,7 @@ apple-health-to-sqlite follows
 - Data the tool does not recognise is kept in an `unhandled` table and reported at the end of the run, rather than dropped.
 - `apple-health-to-sqlite synthesize` writes an export of invented data, to try the tool without your own.
 - `apple-health-to-sqlite schema-diff` compares an export's declared format with the one the tool knows, and prints declarations only, no health data.
-- Runs on Python 3.11 or newer, without further dependencies.
+- Runs on Linux, macOS and Windows with Python 3.11 or newer, without further dependencies.
 
-[Unreleased]: https://github.com/sercxanto/apple-health-to-sqlite/commits/main
+[Unreleased]: https://github.com/sercxanto/apple-health-to-sqlite/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/sercxanto/apple-health-to-sqlite/releases/tag/v0.1.0
