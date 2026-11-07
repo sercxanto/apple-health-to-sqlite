@@ -7,6 +7,8 @@ apple-health-to-sqlite follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-07
+
 ### Added
 
 - Exports of HealthKit version 17 are fully imported: time per workout zone is in the new tables `workout_zone_groups` and `workout_zones`, and `workout_records` says which records belong to which workout.
@@ -51,5 +53,6 @@ apple-health-to-sqlite follows
 - `apple-health-to-sqlite schema-diff` compares an export's declared format with the one the tool knows, and prints declarations only, no health data.
 - Runs on Linux, macOS and Windows with Python 3.11 or newer, without further dependencies.
 
-[Unreleased]: https://github.com/sercxanto/apple-health-to-sqlite/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/sercxanto/apple-health-to-sqlite/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/sercxanto/apple-health-to-sqlite/releases/tag/v0.2.0
 [0.1.0]: https://github.com/sercxanto/apple-health-to-sqlite/releases/tag/v0.1.0
