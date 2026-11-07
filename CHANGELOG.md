@@ -19,6 +19,10 @@ apple-health-to-sqlite follows
 ### Changed
 
 - `nightly_sleep` is now a table rather than a view, with the same columns. Queries that read it keep working.
+- Python 3.14 and 3.15 are supported.
+- Reconciling days with several sources takes a fraction of the time on busy days, with the same results.
+- Pressing Ctrl-C ends a command with a short message rather than a Python traceback.
+- `--help` and the documentation say how to write paths after `--types` or `--exclude-types`: end the list with `--`.
 
 ### Fixed
 

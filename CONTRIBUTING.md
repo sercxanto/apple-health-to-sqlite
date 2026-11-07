@@ -130,6 +130,7 @@ apple_health_to_sqlite/
     pipeline.py     orchestration: archive → schema check → import → derive
     archive.py      finding files inside an export (zip, directory, bare XML)
     dtd.py          parsing, version-gating and diffing Apple's schema
+    schema_tools.py what extract-schema and schema-diff do with a real export
     schema/         the committed DTD — see its NOTES.md
     catalog/        what values mean, and how days add up — see its NOTES.md
     importer.py     streaming XML → rows, one handler per element
@@ -311,17 +312,6 @@ the deployment to PyPI, publishes them there, and creates a GitHub Release with 
 changelog section as its notes. Neither index holds a token for this project: they
 trust the workflow through
 [Trusted Publishing](https://docs.pypi.org/trusted-publishers/).
-
-### Before the first release
-
-These settings live outside the repository, and only the maintainer can make them:
-
-1. On PyPI and on TestPyPI, add a pending trusted publisher for the project
-   `apple-health-to-sqlite`: owner `sercxanto`, repository
-   `apple-health-to-sqlite`, workflow `release.yml`, and the environment `pypi`
-   or `testpypi` respectively.
-2. On GitHub, create the environments `pypi` and `testpypi`, both limited to tags
-   `v*`. `pypi` gets the maintainer as required reviewer.
 
 ### Cutting release X.Y.Z
 

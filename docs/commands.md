@@ -42,6 +42,10 @@ bare XML file. The main file is spelled `Export.xml` on some devices and
 | `--no-derived` | skip rebuilding `daily_metrics` and the views |
 | `--quiet` | no progress output and no summary; what could not be imported is still reported, on stderr |
 
+`--types` and `--exclude-types` take everything up to the next option as a type.
+Write them after the paths, or end the list with `--`:
+`import --types StepCount HeartRate -- Export.zip mine/`.
+
 Running the same import twice is safe. Every row's primary key is a hash of the
 fields that identify it, so re-importing merges: unchanged rows are ignored,
 new ones are added.

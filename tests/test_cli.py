@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import contextlib
+import io
 import sqlite3
 import subprocess
 import sys
@@ -9,8 +11,9 @@ import tomllib
 import unittest
 import zipfile
 from pathlib import Path
+from unittest import mock
 
-from apple_health_to_sqlite import db, layout
+from apple_health_to_sqlite import cli, db, layout
 
 from . import support
 
@@ -485,7 +488,46 @@ class FailureTest(unittest.TestCase):
         )
 
 
+class InterruptTest(unittest.TestCase):
+    def test_ctrl_c_ends_in_a_sentence_and_the_usual_status(self):
+        def interrupted(_arguments):
+            raise KeyboardInterrupt
+
+        errors = io.StringIO()
+        with (
+            mock.patch.dict(cli.COMMANDS, {"schema-diff": interrupted}),
+            contextlib.redirect_stderr(errors),
+        ):
+            status = cli.main(["schema-diff", "Export.zip"])
+
+        self.assertEqual(status, 130)
+        self.assertIn("Interrupted", errors.getvalue())
+
+
 class ParserTest(unittest.TestCase):
+    def test_paths_can_follow_the_type_lists_after_a_double_dash(self):
+        directory = support.workspace("cli")
+        result = run(
+            "import",
+            "--quiet",
+            "--types",
+            "StepCount",
+            "HeartRate",
+            "--",
+            str(support.sample_export(days=4)),
+            str(directory),
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            {
+                row[0]
+                for row in support.rows(
+                    directory / "health.db", "select distinct type_short from records"
+                )
+            },
+            {"StepCount", "HeartRate"},
+        )
+
     def test_no_command_fails(self):
         result = run()
         self.assertNotEqual(result.returncode, 0)

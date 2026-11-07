@@ -112,6 +112,8 @@ def coverage() -> None:
     the one with the dev extras installed, and its console script may not be on
     the PATH.
     """
+    # Combining would otherwise take in whatever an interrupted run left behind.
+    subprocess.run([sys.executable, "-m", "coverage", "erase"], cwd=ROOT)
     tests = subprocess.run(
         [
             sys.executable,
@@ -129,6 +131,9 @@ def coverage() -> None:
         ],
         cwd=ROOT,
     )
+    # The tests start the command line as separate processes, and each leaves a
+    # data file of its own.
+    subprocess.run([sys.executable, "-m", "coverage", "combine", "--quiet"], cwd=ROOT)
     report = subprocess.run([sys.executable, "-m", "coverage", "report"], cwd=ROOT)
     # `coverage html` enforces `fail_under` as well, so its status would be the
     # same gate counted a second time. The report's is the one that decides.
@@ -161,9 +166,9 @@ def clean() -> None:
                 shutil.rmtree(target, ignore_errors=True)
                 removed.append(str(target.relative_to(ROOT)))
 
-    coverage_data = ROOT / ".coverage"
-    if coverage_data.exists():
-        coverage_data.unlink()
-        removed.append(".coverage")
+    for pattern in (".coverage", ".coverage.*"):
+        for coverage_data in ROOT.glob(pattern):
+            coverage_data.unlink()
+            removed.append(coverage_data.name)
 
     print(f"Removed {len(removed)} path(s)" if removed else "Nothing to remove")

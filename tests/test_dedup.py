@@ -6,6 +6,7 @@ and returns the day's value with each instant credited to one source only.
 
 from __future__ import annotations
 
+import random
 import unittest
 
 from apple_health_to_sqlite.dedup import deduplicated_value
@@ -68,6 +69,46 @@ class DeduplicatedValueTest(unittest.TestCase):
     def test_a_sample_ending_before_it_starts_counts_in_full(self):
         samples = [(0, 10, 100, "A"), (20, 15, 7, "B")]
         self.assertEqual(deduplicated_value(samples), 107)
+
+
+def credited_second_by_second(samples) -> float:
+    """The same answer the slow and obvious way, on whole seconds."""
+    covered: dict[str, set[int]] = {}
+    for start, end, _value, source in samples:
+        covered.setdefault(source, set()).update(range(start, end))
+    ranked = sorted(covered, key=lambda source: (-len(covered[source]), source))
+    owner: dict[int, str] = {}
+    for source in ranked:
+        for second in covered[source]:
+            owner.setdefault(second, source)
+    return sum(
+        value
+        * sum(owner[second] == source for second in range(start, end))
+        / (end - start)
+        for start, end, value, source in samples
+    )
+
+
+class AgainstAReferenceTest(unittest.TestCase):
+    def test_random_days_agree_with_counting_every_second(self):
+        generator = random.Random(20261107)
+        for _ in range(300):
+            samples = []
+            for _ in range(generator.randrange(1, 40)):
+                start = generator.randrange(500)
+                samples.append(
+                    (
+                        start,
+                        start + generator.randrange(1, 60),
+                        generator.randrange(1, 100),
+                        generator.choice("ABC"),
+                    )
+                )
+            self.assertAlmostEqual(
+                deduplicated_value(samples),
+                credited_second_by_second(samples),
+                msg=repr(samples),
+            )
 
 
 class SamplesWithoutDurationTest(unittest.TestCase):
