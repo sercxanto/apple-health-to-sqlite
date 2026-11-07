@@ -152,6 +152,10 @@ class ImportOptions:
     derived: bool = True
     progress: bool = True
 
+    def __post_init__(self) -> None:
+        if self.since is not None:
+            self.since = timestamps.calendar_day(self.since)
+
 
 @dataclass
 class ImportResult:
@@ -189,9 +193,6 @@ class Importer:
                 if short
             }
         self._excluded_types = {t.lower() for t in self.options.exclude_types}
-        self._since_ts = (
-            timestamps.start_of_day(self.options.since) if self.options.since else None
-        )
 
     # -- buffered writes ---------------------------------------------------
 
@@ -233,12 +234,19 @@ class Importer:
 
     # -- filtering ---------------------------------------------------------
 
-    def wanted(self, type_name: str | None, start_ts: int | None) -> bool:
-        if (
-            self._since_ts is not None
-            and start_ts is not None
-            and start_ts < self._since_ts
-        ):
+    def in_date_range(self, local_date: str | None) -> bool:
+        """Whether an entry dated `local_date` passes `--since`.
+
+        Compared as calendar days where the entry was recorded, not as instants:
+        the user asks for a day as they lived it, and at +0200 the first two
+        hours of that day are still the day before in UTC. An entry without a
+        readable date is kept, since nothing says it is too old.
+        """
+        since = self.options.since
+        return since is None or local_date is None or local_date >= since
+
+    def wanted(self, type_name: str | None, local_date: str | None) -> bool:
+        if not self.in_date_range(local_date):
             return False
         if not type_name:
             return True
@@ -259,7 +267,7 @@ class Importer:
         local_date, start_local, start_ts = timestamps.parse(
             attributes.get("startDate")
         )
-        if not self.wanted(type_name, start_ts):
+        if not self.wanted(type_name, local_date):
             return None
 
         _, end_local, end_ts = timestamps.parse(attributes.get("endDate"))
@@ -324,6 +332,11 @@ class Importer:
     def handle_correlation(self, element) -> None:
         attributes = element.attrib
         local_date, _, start_ts = timestamps.parse(attributes.get("startDate"))
+        if not self.in_date_range(local_date):
+            # Its records are not lost: each one also appears at top level and
+            # is judged by its own date there. Reading them here would link them
+            # to a correlation that is not in the database.
+            return
         _, _, end_ts = timestamps.parse(attributes.get("endDate"))
         type_name = attributes.get("type")
         correlation_id = db.content_id(
@@ -435,11 +448,7 @@ class Importer:
         local_date, start_local, start_ts = timestamps.parse(
             attributes.get("startDate")
         )
-        if (
-            self._since_ts is not None
-            and start_ts is not None
-            and start_ts < self._since_ts
-        ):
+        if not self.in_date_range(local_date):
             return
         _, _, end_ts = timestamps.parse(attributes.get("endDate"))
         activity_type = attributes.get("workoutActivityType")
@@ -585,6 +594,9 @@ class Importer:
 
     def handle_activity_summary(self, element) -> None:
         attributes = element.attrib
+        # Already a plain calendar day, with no time or offset to parse.
+        if not self.in_date_range(attributes.get("dateComponents") or None):
+            return
         self.add(
             "activity_summaries",
             (
@@ -603,6 +615,8 @@ class Importer:
 
     def handle_clinical_record(self, element) -> None:
         attributes = element.attrib
+        if not self.in_date_range(timestamps.parse(attributes.get("receivedDate"))[0]):
+            return
         self.add(
             "clinical_records",
             (
@@ -623,6 +637,8 @@ class Importer:
 
     def handle_audiogram(self, element) -> None:
         attributes = element.attrib
+        if not self.in_date_range(timestamps.parse(attributes.get("startDate"))[0]):
+            return
         audiogram_id = db.content_id(
             attributes.get("type"),
             attributes.get("sourceName"),
@@ -686,6 +702,8 @@ class Importer:
 
     def handle_vision_prescription(self, element) -> None:
         attributes = element.attrib
+        if not self.in_date_range(timestamps.parse(attributes.get("dateIssued"))[0]):
+            return
         prescription_id = db.content_id(
             attributes.get("type"),
             attributes.get("dateIssued"),

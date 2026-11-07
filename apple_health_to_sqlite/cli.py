@@ -11,7 +11,7 @@ import sys
 import textwrap
 from pathlib import Path
 
-from . import __version__, dtd, layout, pipeline, schema_tools, synthetic
+from . import __version__, dtd, layout, pipeline, schema_tools, synthetic, timestamps
 from .archive import ExportNotFound
 from .importer import ImportOptions
 
@@ -80,7 +80,9 @@ def build_parser() -> argparse.ArgumentParser:
         "the database",
     )
     importer.add_argument(
-        "--since", metavar="YYYY-MM-DD", help="only data from this date on"
+        "--since",
+        metavar="YYYY-MM-DD",
+        help="only data from this calendar day on, as dated where it was recorded",
     )
     importer.add_argument(
         "--no-routes", action="store_true", help="skip the GPX workout routes"
@@ -255,6 +257,7 @@ def main(argv: list[str] | None = None) -> int:
         ExportNotFound,
         FileNotFoundError,
         layout.UnusableDirectory,
+        timestamps.InvalidDate,
     ) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1

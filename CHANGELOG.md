@@ -15,6 +15,9 @@ apple-health-to-sqlite follows
 ### Fixed
 
 - Elements nested inside a known element could be lost without a word: version 17 workout zones were, and so was the metadata of correlations, workout events and workout routes. All of these are now imported, and anything unrecognised is kept in `unhandled` and reported at any depth, under a path such as `Workout/SomeNewElement`. To get the missing data, import your export again; existing rows stay as they are.
+- `import --since` now goes by the calendar day an entry was recorded on. Before, it cut at midnight UTC, so data from just after midnight could be missing east of UTC, and data from the evening before could slip in west of it.
+- `import --since` now also filters correlations, activity summaries, clinical records, audiograms and vision prescriptions, not just records and workouts.
+- `import --since` refuses a date it cannot read. Before, a mistyped date turned the filter off and imported everything without a word.
 
 ## [0.1.0] - 2026-11-07
 

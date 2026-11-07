@@ -163,6 +163,14 @@ class ImportDirectoryTest(unittest.TestCase):
         self.assertEqual((directory / "metadata.yml").read_text(), "somebody else's\n")
         self.assertFalse((directory / layout.DATABASE_NAME).exists())
 
+    def test_a_mistyped_since_date_stops_before_anything_is_written(self):
+        directory = support.workspace("cli") / "new"
+        result = run("import", str(self.export), str(directory), "--since", "yesterday")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("YYYY-MM-DD", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+        self.assertFalse(directory.exists())
+
     def test_a_failed_import_leaves_no_configuration_behind(self):
         directory = support.workspace("cli")
         run("import", "/nope/Export.zip", str(directory))

@@ -87,13 +87,14 @@ class GpxTimeTest(unittest.TestCase):
         self.assertIsNone(timestamps.parse_gpx_time(None))
 
 
-class StartOfDayTest(unittest.TestCase):
-    def test_midnight_utc(self):
-        instant = timestamps.start_of_day("2026-08-15")
-        self.assertEqual(
-            datetime.fromtimestamp(instant, UTC).strftime("%Y-%m-%d %H:%M"),
-            "2026-08-15 00:00",
-        )
+class CalendarDayTest(unittest.TestCase):
+    def test_returns_the_day_in_its_full_form(self):
+        self.assertEqual(timestamps.calendar_day("2026-08-15"), "2026-08-15")
+        self.assertEqual(timestamps.calendar_day("2026-8-5"), "2026-08-05")
+
+    def test_says_what_form_it_wants(self):
+        with self.assertRaisesRegex(timestamps.InvalidDate, "YYYY-MM-DD"):
+            timestamps.calendar_day("15.08.2026")
 
 
 if __name__ == "__main__":

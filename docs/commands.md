@@ -37,7 +37,7 @@ bare XML file. The main file is spelled `Export.xml` on some devices and
 | --- | --- |
 | `--types StepCount HeartRate` | only these record types, short or fully qualified |
 | `--exclude-types HeartRate` | skip these; excluding heart rate typically halves the database |
-| `--since 2024-01-01` | only data from this date onwards |
+| `--since 2024-01-01` | only data from this calendar day onwards, in the time zone each entry was recorded in; applies to everything with a date, and keeps entries whose date cannot be read |
 | `--no-routes` | skip the GPX workout routes |
 | `--no-derived` | skip rebuilding `daily_metrics` and the views |
 | `--quiet` | no progress output |
