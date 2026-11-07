@@ -171,6 +171,12 @@ class ImportResult:
     #: Differences between the export's own DTD and the bundled one, if any.
     schema_differences: list[str] = field(default_factory=list)
     routes_imported: int = 0
+    #: Route files the export names but does not contain.
+    routes_missing: list[str] = field(default_factory=list)
+    #: Route files that could not be read to their end, and were skipped.
+    routes_damaged: list[str] = field(default_factory=list)
+    #: Files in the export nothing read, counted per top-level directory.
+    files_not_read: dict[str, int] = field(default_factory=dict)
     elements_seen: int = 0
     elapsed_s: float = 0.0
 
@@ -183,7 +189,8 @@ class Importer:
         self.options = options or ImportOptions()
         self.result = ImportResult()
         self.buffers: dict[str, list[tuple]] = {}
-        self.route_owners: dict[str, int] = {}
+        #: The route files each workout names, in the export's order.
+        self.route_references: dict[int, list[str]] = {}
 
         self._wanted_types: set[str] | None = None
         if self.options.types:
@@ -460,7 +467,8 @@ class Importer:
             attributes.get("endDate"),
         )
 
-        route_file: str | None = None
+        route_files: list[str] = []
+        route_seq = 0
         statistics: list[tuple] = []
         event_seq = 0
         zone_group_seq = 0
@@ -481,14 +489,9 @@ class Importer:
                     workout_id, child, statistics, event_seq
                 )
             elif child.tag == "WorkoutRoute":
-                for part in child:
-                    if part.tag == "FileReference":
-                        route_file = part.get("path", "").rsplit("/", 1)[-1]
-                    elif part.tag == "MetadataEntry":
-                        self.add(
-                            "workout_metadata",
-                            (workout_id, f"route:{part.get('key')}", part.get("value")),
-                        )
+                route_seq = self._add_workout_route(
+                    workout_id, route_seq, child, route_files
+                )
             elif child.tag == "WorkoutZoneGroup":
                 self._add_zone_group(workout_id, "", zone_group_seq, child)
                 zone_group_seq += 1
@@ -521,8 +524,9 @@ class Importer:
             if energy is None and stat_type.endswith("ActiveEnergyBurned"):
                 energy, energy_unit = total, unit
 
-        if route_file:
-            self.route_owners[route_file.lower()] = workout_id
+        if route_files:
+            references = self.route_references.setdefault(workout_id, [])
+            references.extend(name for name in route_files if name not in references)
 
         self.add(
             "workouts",
@@ -548,10 +552,51 @@ class Importer:
                 start_ts,
                 end_ts,
                 None if start_ts is None or end_ts is None else end_ts - start_ts,
-                route_file,
+                route_files[0] if route_files else None,
                 None,
             ),
         )
+
+    def _add_workout_route(
+        self, workout_id: int, seq: int, element, route_files: list[str]
+    ) -> int:
+        """One `WorkoutRoute`: a row per file it names, returning the next seq.
+
+        The first route's metadata keeps the plain `route:<key>`, which is what
+        databases already hold. A later route needs its number in the key, or it
+        would collide with the first and be ignored.
+        """
+        prefix = "route:" if seq == 0 else f"route:{seq}:"
+        names: list[str] = []
+        for part in element:
+            if part.tag == "FileReference":
+                name = part.get("path", "").rsplit("/", 1)[-1]
+                if name:
+                    names.append(name)
+            elif part.tag == "MetadataEntry":
+                self.add(
+                    "workout_metadata",
+                    (workout_id, f"{prefix}{part.get('key')}", part.get("value")),
+                )
+
+        attributes = element.attrib
+        for offset, name in enumerate(names or [None]):
+            self.add(
+                "workout_routes",
+                (
+                    workout_id,
+                    seq + offset,
+                    name,
+                    attributes.get("sourceName"),
+                    attributes.get("sourceVersion"),
+                    attributes.get("device"),
+                    attributes.get("creationDate"),
+                    attributes.get("startDate"),
+                    attributes.get("endDate"),
+                ),
+            )
+        route_files.extend(names)
+        return seq + max(len(names), 1)
 
     def _handle_workout_activity(
         self, workout_id: int, element, statistics: list[tuple], event_seq: int

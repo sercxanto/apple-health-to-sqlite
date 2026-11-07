@@ -12,11 +12,15 @@ workout_statistics      per-workout aggregates (distance, energy, heart rate)
 workout_activities      segments of a multi-sport workout
 workout_events          pause / resume / lap
 workout_metadata        MetadataEntry per workout, and of its segments (<uuid>:<key>),
-                        events (event:<seq>:<key>) and route (route:<key>)
+                        events (event:<seq>:<key>) and routes (route:<key> for the
+                        first, route:<seq>:<key> for any later one)
 workout_records         which records were taken during which workout
+workout_routes          one row per route of a workout: its file, source and time;
+                        workouts.route_file names the first
 workout_zone_groups     a workout's or segment's zones: what they measure, and the unit
 workout_zones           the zones of a group: bounds and the time spent in them
-workout_points          GPS points from the GPX routes
+workout_points          GPS points from the GPX routes, numbered through all routes
+                        of a workout
 activity_summaries      the three rings, per day
 clinical_records        references to clinical documents
 audiograms(+_points)    hearing tests, with masking and clamping range per ear

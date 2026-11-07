@@ -191,9 +191,24 @@ def _report(args: argparse.Namespace, database: Path, result) -> None:
     print(f"\nDatabase size: {database.stat().st_size / 1e6:.1f} MB")
     print(f"View it with: {layout.view_command(args.directory)}")
 
+    # Here and not among the gaps: every export has such files, so --quiet would
+    # never be quiet, and they are not something this run went wrong on.
+    if result.files_not_read:
+        print("\nFiles in the export that were not imported:")
+        for name, count in sorted(result.files_not_read.items()):
+            print(f"  {name:22} {count:>12,}")
+
 
 def _report_gaps(result, stream: TextIO) -> None:
     """Say what the import could not take in, whatever else is being reported."""
+    for heading, names in (
+        ("Workout routes that are damaged, and were skipped:", result.routes_damaged),
+        ("Workout routes the export names but does not hold:", result.routes_missing),
+    ):
+        if names:
+            print(f"\n{heading}", file=stream)
+            for name in sorted(set(names)):
+                print(f"  {name}", file=stream)
     if result.unhandled:
         print(
             "\nElements without a handler (raw XML kept in table 'unhandled'):",

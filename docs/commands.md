@@ -47,10 +47,15 @@ fields that identify it, so re-importing merges: unchanged rows are ignored,
 new ones are added.
 
 At the end of the run, the importer reports any element it did not recognise.
-Those are kept verbatim in the `unhandled` table rather than dropped.
+Those are kept verbatim in the `unhandled` table rather than dropped. It also
+counts the files in the export it did not read, per directory: `export_cda.xml`,
+clinical documents and ECG recordings are not imported, nor are routes no workout
+names.
 
-If `Export.xml` or a workout route turns out to be damaged, the import stops
-with a message naming the file, exit status 1, and no new data in the database.
+A workout route that is damaged, or that the export names but does not hold, is
+skipped and reported by name, even with `--quiet`; the rest is imported and the
+exit status is 0. If `Export.xml` itself is damaged, the import stops with a
+message naming it, exit status 1, and no new data in the database.
 
 ## synthesize
 

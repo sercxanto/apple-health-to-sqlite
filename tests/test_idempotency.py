@@ -30,6 +30,7 @@ TABLES = (
     "workout_metadata",
     "extra_metadata",
     "workout_points",
+    "workout_routes",
     "activity_summaries",
     "audiograms",
     "vision_prescriptions",

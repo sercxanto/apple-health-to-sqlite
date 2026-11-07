@@ -10,7 +10,7 @@ import unittest
 import zipfile
 from pathlib import Path
 
-from apple_health_to_sqlite import layout
+from apple_health_to_sqlite import db, layout
 
 from . import support
 
@@ -87,6 +87,17 @@ class ImportCommandTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, "")
         self.assertIn("SomethingNew", result.stderr)
+
+    def test_the_summary_counts_files_that_were_not_imported(self):
+        export = support.write_export("")
+        result = run("import", str(export), str(support.workspace("cli")))
+        self.assertIn("not imported", result.stdout)
+        self.assertIn("export_cda.xml", result.stdout)
+
+    def test_quiet_does_not_list_files_every_export_has(self):
+        export = support.write_export("")
+        result = run("import", str(export), str(support.workspace("cli")), "--quiet")
+        self.assertEqual(result.stderr, "")
 
     def test_quiet_still_reports_a_different_schema(self):
         export = support.write_export("", version=99)
@@ -360,19 +371,63 @@ class FailureTest(unittest.TestCase):
             with self.subTest(command=command):
                 self.assert_explained(run(command, str(export)), "damaged")
 
-    def test_a_damaged_route_names_the_file_and_changes_nothing(self):
+    def test_a_damaged_export_changes_nothing_in_the_database(self):
         directory = support.workspace("cli")
-        run("import", str(support.write_export("")), str(directory), "--quiet")
+        run("import", str(support.export_from_fixture("workouts")), str(directory))
+        database = directory / "health.db"
+        before = support.one(database, "select count(*) from records")
 
+        # More than one batch, so that rows have reached SQLite before the damage
+        # shows, and only the transaction can keep them out.
+        body = "".join(
+            '<Record type="HKQuantityTypeIdentifierStepCount" sourceName="Watch" '
+            f'startDate="2026-03-01 08:00:00 +0100" value="{index}" '
+            'endDate="2026-03-01 08:10:00 +0100"/>\n'
+            for index in range(db.BATCH_SIZE + 1)
+        )
+        broken = support.workspace("cli") / "Export.xml"
+        broken.write_text(support.wrap_body(body)[:-20], encoding="utf-8")
+        result = run("import", str(broken), str(directory))
+
+        self.assert_explained(result, "damaged")
+        self.assertEqual(support.one(database, "select count(*) from records"), before)
+
+    def test_a_damaged_route_is_named_and_the_rest_is_imported(self):
+        directory = support.workspace("cli")
         export = support.export_from_fixture(
             "workouts", routes={"route_a.gpx": "<gpx><trk>"}
         )
         result = run("import", str(export), str(directory))
 
-        self.assert_explained(result, "route_a.gpx", "damaged")
-        self.assertEqual(
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("damaged", result.stdout)
+        self.assertIn("route_a.gpx", result.stdout)
+        self.assertGreater(
             support.one(directory / "health.db", "select count(*) from workouts"), 0
         )
+        self.assertEqual(
+            support.one(
+                directory / "health.db",
+                "select count(*) from sqlite_master where name = 'daily_metrics'",
+            ),
+            1,
+            "the run went on to build the derived tables",
+        )
+
+    def test_quiet_still_names_a_damaged_route(self):
+        export = support.export_from_fixture(
+            "workouts", routes={"route_a.gpx": "<gpx><trk>"}
+        )
+        result = run("import", str(export), str(support.workspace("cli")), "--quiet")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("route_a.gpx", result.stderr)
+
+    def test_quiet_still_names_a_missing_route(self):
+        export = support.export_from_fixture("workouts")
+        result = run("import", str(export), str(support.workspace("cli")), "--quiet")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("route_a.gpx", result.stderr)
 
     def test_the_import_works_again_after_a_failed_one(self):
         directory = support.workspace("cli")
