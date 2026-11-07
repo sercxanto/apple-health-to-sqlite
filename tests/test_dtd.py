@@ -243,5 +243,52 @@ class DiffTest(unittest.TestCase):
         self.assertTrue(any("export version" in line for line in differences))
 
 
+class EveryAttributeReachesTheDatabaseTest(unittest.TestCase):
+    """An element with a handler can still lose an attribute without a word.
+
+    The document below holds every element wherever the schema allows it, with a
+    value of its own in every attribute. Each value has to turn up in the
+    database. They are numbers, because many columns only take numbers, and all
+    the same length, so that none can be mistaken for part of another.
+    """
+
+    def build(self, schema, name: str, path: str, values: dict[str, str]) -> str:
+        element = schema.elements[name]
+        attributes = ""
+        for attribute in sorted(element.attributes):
+            value = f"{1_000_000 + len(values)}.5"
+            values[f"{path}/@{attribute}"] = value
+            attributes += f' {attribute}="{value}"'
+        children = "".join(
+            self.build(schema, child, f"{path}/{child}", values)
+            for child in sorted(element.children())
+        )
+        return f"<{name}{attributes}>{children}</{name}>\n"
+
+    def test_every_declared_attribute_arrives_wherever_it_can_occur(self):
+        values: dict[str, str] = {}
+        body = self.build(dtd.bundled(), "HealthData", "HealthData", values)
+        export = support.workspace("export") / "Export.xml"
+        export.write_text(
+            '<?xml version="1.0" encoding="UTF-8"?>\n' + dtd.bundled_text() + body,
+            encoding="utf-8",
+        )
+
+        database, result = support.import_export(export)
+
+        self.assertEqual(result.unhandled, {})
+        self.assertGreater(len(values), 150, "the document should cover the schema")
+        tables = support.rows(
+            database, "select name from sqlite_master where type = 'table'"
+        )
+        stored = "\n".join(
+            str(row)
+            for (table,) in tables
+            for row in support.rows(database, f"select * from {table}")
+        )
+        missing = sorted(path for path, value in values.items() if value not in stored)
+        self.assertEqual(missing, [])
+
+
 if __name__ == "__main__":
     unittest.main()

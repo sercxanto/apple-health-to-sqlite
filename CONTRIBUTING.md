@@ -201,11 +201,14 @@ at it. Then:
    until it does.
 2. **Add a handler** in `apple_health_to_sqlite/importer.py`, and list the element in
    `TOP_LEVEL_ELEMENTS` or, under its parent, in `CHILD_ELEMENTS`. `tests/test_dtd.py`
-   fails until every declared element and nesting is accounted for, which is the
-   point.
+   fails until every declared element, nesting and attribute is accounted for, which
+   is the point.
 3. **Add a table** in `apple_health_to_sqlite/db.py` if the data does not fit an existing
    one. Give it a content-addressed primary key so re-import stays idempotent;
-   child tables key on `(parent_id, seq)` or `(parent_id, name)`.
+   child tables key on `(parent_id, seq)` or `(parent_id, name)`. A new column on
+   an existing table goes at the end of it, with a step in `MIGRATIONS`; and since
+   `INSERT OR IGNORE` leaves existing rows as they are, it also needs an entry in
+   `Importer.STATEMENTS` if a re-import is to fill it in.
 4. **Synthesize it.** Teach `apple_health_to_sqlite/synthetic.py` to emit the element —
    `tests/test_synthetic.py` asserts the synthesizer covers every element that
    can occur, so this is not optional. Synthetic exports must stay valid

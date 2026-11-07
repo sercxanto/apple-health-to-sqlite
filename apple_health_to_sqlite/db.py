@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS export_meta (
     source_file TEXT, locale TEXT, export_date TEXT,
     healthkit_export_version INTEGER, imported_at TEXT,
     me_date_of_birth TEXT, me_biological_sex TEXT, me_blood_type TEXT,
-    me_skin_type TEXT
+    me_skin_type TEXT, me_cardio_fitness_medications_use TEXT
 );
 
 CREATE TABLE IF NOT EXISTS records (
@@ -93,8 +93,7 @@ CREATE TABLE IF NOT EXISTS workout_activities (
 ) WITHOUT ROWID;
 
 -- Which records were taken during which workout. A table rather than a column
--- on records, because one record could belong to several workouts, and because
--- a column could not be added to the databases that already exist.
+-- on records, because one record could belong to several workouts.
 CREATE TABLE IF NOT EXISTS workout_records (
     workout_id INTEGER, record_id INTEGER,
     PRIMARY KEY (workout_id, record_id)
@@ -149,7 +148,8 @@ CREATE TABLE IF NOT EXISTS clinical_records (
 CREATE TABLE IF NOT EXISTS audiograms (
     id INTEGER PRIMARY KEY,
     type TEXT, source_name TEXT, device TEXT,
-    start_date TEXT, end_date TEXT, start_ts INTEGER
+    start_date TEXT, end_date TEXT, start_ts INTEGER,
+    source_version TEXT, creation_date TEXT
 );
 
 CREATE TABLE IF NOT EXISTS audiogram_points (
@@ -215,8 +215,26 @@ CREATE INDEX IF NOT EXISTS idx_workouts_activity ON workouts (activity_short);
 BATCH_SIZE = 5000
 
 
+#: What turns a database of each earlier layout into the next one. New tables need
+#: no step here, `SCHEMA` creates them. A new column does: add it at the end of its
+#: table in `SCHEMA` too, since rows are inserted by position and the two have to
+#: agree on the order. `tests/test_db_layout.py` compares them.
+MIGRATIONS: tuple[tuple[str, ...], ...] = (
+    # 1: the attributes that were declared but not read.
+    (
+        "ALTER TABLE audiograms ADD COLUMN source_version TEXT",
+        "ALTER TABLE audiograms ADD COLUMN creation_date TEXT",
+        "ALTER TABLE export_meta ADD COLUMN me_cardio_fitness_medications_use TEXT",
+    ),
+)
+
+#: The layout version of a current database, kept in `PRAGMA user_version`. Version
+#: 0.1.0 left that at 0, which is what every migration above starts from.
+SCHEMA_VERSION = len(MIGRATIONS)
+
+
 class UnusableDatabase(Exception):
-    """Raised when SQLite refuses the database an import is writing to."""
+    """Raised when the database an import is writing to cannot be used."""
 
 
 def connect(path: str) -> sqlite3.Connection:
@@ -224,11 +242,30 @@ def connect(path: str) -> sqlite3.Connection:
     connection = sqlite3.connect(path)
     try:
         connection.executescript("PRAGMA journal_mode=WAL; PRAGMA synchronous=OFF;")
-        connection.executescript(SCHEMA)
-    except sqlite3.Error:
+        _bring_up_to_date(connection, path)
+    except (sqlite3.Error, UnusableDatabase):
         connection.close()
         raise
     return connection
+
+
+def _bring_up_to_date(connection: sqlite3.Connection, path: str) -> None:
+    """Create what is missing and migrate what is old, all or nothing."""
+    version = connection.execute("PRAGMA user_version").fetchone()[0]
+    if version > SCHEMA_VERSION:
+        raise UnusableDatabase(
+            f"{path} was written by a newer version of this tool. Upgrade the tool, "
+            f"or import into a new directory."
+        )
+    # A new database gets the current layout from `SCHEMA` and has nothing to catch
+    # up on; running the migrations would add columns it already has.
+    is_new = (
+        connection.execute("SELECT 1 FROM sqlite_master LIMIT 1").fetchone() is None
+    )
+    steps = () if is_new else MIGRATIONS[version:]
+    statements = "".join(f"{sql};\n" for step in steps for sql in step)
+    stamp = f"PRAGMA user_version = {SCHEMA_VERSION};"
+    connection.executescript(f"BEGIN;\n{SCHEMA}\n{statements}{stamp}\nCOMMIT;")
 
 
 def collapse_unhandled(connection: sqlite3.Connection) -> None:

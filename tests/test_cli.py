@@ -457,6 +457,17 @@ class FailureTest(unittest.TestCase):
         result = run("import", str(export), str(directory))
         self.assert_explained(result, "health.db", "new directory")
 
+    def test_a_database_from_a_newer_version(self):
+        directory = support.workspace("cli")
+        export = support.write_export("")
+        run("import", str(export), str(directory), "--quiet")
+        connection = sqlite3.connect(directory / "health.db")
+        connection.execute(f"pragma user_version = {db.SCHEMA_VERSION + 1}")
+        connection.close()
+
+        result = run("import", str(export), str(directory))
+        self.assert_explained(result, "health.db", "newer version")
+
     def test_a_file_that_is_not_a_database(self):
         directory = support.workspace("cli")
         (directory / "health.db").write_text("not a database, sorry\n" * 100)

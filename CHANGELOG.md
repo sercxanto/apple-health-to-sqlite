@@ -13,6 +13,8 @@ apple-health-to-sqlite follows
 - `schema-diff` shows the content and attributes of an element it does not know, not just its name.
 - The summary of `import` counts the files in the export that were not imported, such as ECG recordings, per directory.
 - `workout_routes` keeps the source, device and time of each workout route, which were not imported before.
+- `audiograms` has the new columns `source_version` and `creation_date`, and `export_meta` has `me_cardio_fitness_medications_use`. An existing database is updated when you next import into it, and that import fills them in.
+- An import refuses a database written by a newer version of the tool, rather than failing somewhere along the way.
 
 ### Changed
 

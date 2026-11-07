@@ -94,7 +94,7 @@ def _write_export_meta(
 ) -> None:
     connection.execute("DELETE FROM export_meta")
     connection.execute(
-        "INSERT INTO export_meta VALUES (?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO export_meta VALUES (?,?,?,?,?,?,?,?,?,?,?)",
         (
             1,
             os.path.abspath(source_file),
@@ -106,6 +106,7 @@ def _write_export_meta(
             result.me.get("HKCharacteristicTypeIdentifierBiologicalSex"),
             result.me.get("HKCharacteristicTypeIdentifierBloodType"),
             result.me.get("HKCharacteristicTypeIdentifierFitzpatrickSkinType"),
+            result.me.get("HKCharacteristicTypeIdentifierCardioFitnessMedicationsUse"),
         ),
     )
     connection.commit()
