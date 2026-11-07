@@ -14,6 +14,8 @@ import tomllib
 import unittest
 from pathlib import Path
 
+from . import support
+
 ROOT = Path(__file__).parent.parent
 README = ROOT / "README.md"
 PAGES = [
@@ -28,6 +30,9 @@ FENCED_CODE = re.compile(r"^```.*?^```", re.DOTALL | re.MULTILINE)
 INLINE_CODE = re.compile(r"`[^`\n]*`")
 HEADING = re.compile(r"^#+\s+(.+?)\s*$", re.MULTILINE)
 LINK = re.compile(r"!?\[[^\]]*\]\(([^)\s]*)\)")
+# The outer target of a linked image such as a badge, [![alt](image)](target),
+# of which LINK sees only the image.
+LINKED_IMAGE = re.compile(r"\[!\[[^\]]*\]\([^)\s]*\)\]\(([^)\s]*)\)")
 # The forms LINK does not see. A document using one would go unchecked, silently.
 OTHER_LINK_FORM = re.compile(
     r"<a\s|<img\s|^\[[^\]]+\]:\s", re.IGNORECASE | re.MULTILINE
@@ -45,7 +50,8 @@ def read_prose(path: Path) -> str:
 
 
 def links(path: Path) -> list[str]:
-    return LINK.findall(read_prose(path))
+    prose = read_prose(path)
+    return LINK.findall(prose) + LINKED_IMAGE.findall(prose)
 
 
 def anchors(path: Path) -> set[str]:
@@ -74,6 +80,13 @@ def problem_with(source: Path, target: Path, anchor: str) -> str | None:
     if anchor and anchor not in anchors(target):
         return f"{source.name} links to #{anchor}, not a heading of {target.name}"
     return None
+
+
+class LinkExtractionTest(unittest.TestCase):
+    def test_a_linked_image_yields_both_the_image_and_its_target(self):
+        page = support.workspace("docs") / "page.md"
+        page.write_text("[![badge](image.svg)](target.md)\n", encoding="utf-8")
+        self.assertCountEqual(links(page), ["image.svg", "target.md"])
 
 
 class ReadmeLinkTest(unittest.TestCase):

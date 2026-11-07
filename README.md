@@ -1,5 +1,9 @@
 # apple-health-to-sqlite
 
+[![CI](https://github.com/sercxanto/apple-health-to-sqlite/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/sercxanto/apple-health-to-sqlite/actions/workflows/ci.yml)
+[![PyPI version](https://img.shields.io/pypi/v/apple-health-to-sqlite)](https://pypi.org/project/apple-health-to-sqlite/)
+[![Python versions](https://img.shields.io/pypi/pyversions/apple-health-to-sqlite)](https://pypi.org/project/apple-health-to-sqlite/)
+
 Your iPhone and Apple Watch have been taking notes for years: every step,
 every heartbeat they sampled, every night's sleep stages, every workout with
 its GPS route. The Health app shows you that a day at a time. This tool turns
