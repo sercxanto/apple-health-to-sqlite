@@ -92,6 +92,28 @@ CREATE TABLE IF NOT EXISTS workout_activities (
     PRIMARY KEY (workout_id, uuid)
 ) WITHOUT ROWID;
 
+-- Which records were taken during which workout. A table rather than a column
+-- on records, because one record could belong to several workouts, and because
+-- a column could not be added to the databases that already exist.
+CREATE TABLE IF NOT EXISTS workout_records (
+    workout_id INTEGER, record_id INTEGER,
+    PRIMARY KEY (workout_id, record_id)
+) WITHOUT ROWID;
+
+-- activity_uuid as in workout_statistics. Two tables, because a group declares
+-- its type, source and unit once for all its zones and may have no zones at all.
+CREATE TABLE IF NOT EXISTS workout_zone_groups (
+    workout_id INTEGER, activity_uuid TEXT, seq INTEGER,
+    type TEXT, type_short TEXT, source TEXT, unit TEXT,
+    PRIMARY KEY (workout_id, activity_uuid, seq)
+) WITHOUT ROWID;
+
+CREATE TABLE IF NOT EXISTS workout_zones (
+    workout_id INTEGER, activity_uuid TEXT, group_seq INTEGER, seq INTEGER,
+    minimum REAL, maximum REAL, duration REAL, duration_unit TEXT,
+    PRIMARY KEY (workout_id, activity_uuid, group_seq, seq)
+) WITHOUT ROWID;
+
 CREATE TABLE IF NOT EXISTS workout_points (
     workout_id INTEGER, seq INTEGER,
     latitude REAL, longitude REAL, elevation REAL,
@@ -154,9 +176,9 @@ CREATE TABLE IF NOT EXISTS vision_prescriptions (
 );
 
 -- MetadataEntry and Attachment children of the rarer top-level elements
--- (Audiogram, VisionPrescription). They are too infrequent to deserve a table
--- each, and dropping them would violate the rule that nothing disappears
--- silently. owner_type names the table the owner id refers to.
+-- (Correlation, Audiogram, VisionPrescription). They are too infrequent to
+-- deserve a table each, and dropping them would violate the rule that nothing
+-- disappears silently. owner_type names the table the owner id refers to.
 CREATE TABLE IF NOT EXISTS extra_metadata (
     owner_type TEXT, owner_id INTEGER, key TEXT, value TEXT,
     PRIMARY KEY (owner_type, owner_id, key)

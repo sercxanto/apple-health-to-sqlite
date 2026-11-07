@@ -14,3 +14,19 @@
 <FutureHealthThing type="HKSomethingNew" value="43"
                    startDate="2026-08-02 08:00:00 +0200"
                    endDate="2026-08-02 09:00:00 +0200"/>
+
+<!-- New elements can just as well turn up inside known ones, where no top-level
+     check sees them. So can a known element in a place nothing reads it from. -->
+<Workout workoutActivityType="HKWorkoutActivityTypeRunning"
+         sourceName="Apple Watch"
+         startDate="2026-08-03 08:00:00 +0200" endDate="2026-08-03 09:00:00 +0200">
+ <FutureWorkoutDetail value="44"/>
+ <WorkoutActivity uuid="segment" startDate="2026-08-03 08:00:00 +0200">
+  <FutureSegmentDetail value="45"/>
+ </WorkoutActivity>
+ <WorkoutStatistics type="HKQuantityTypeIdentifierHeartRate"
+                    startDate="2026-08-03 08:00:00 +0200"
+                    endDate="2026-08-03 09:00:00 +0200">
+  <MetadataEntry key="HKFakeKey" value="46"/>
+ </WorkoutStatistics>
+</Workout>

@@ -61,7 +61,7 @@ class ImportCommandTest(unittest.TestCase):
         directory = support.workspace("cli")
         result = run("import", str(self.export), str(directory))
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("export version 14", result.stdout)
+        self.assertIn("export version 17", result.stdout)
         self.assertIn("records", result.stdout)
         self.assertGreater(
             support.one(directory / "health.db", "select count(*) from records"), 0
@@ -178,7 +178,7 @@ class SchemaCommandTest(unittest.TestCase):
         result = run("extract-schema", str(self.export))
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("<!DOCTYPE HealthData", result.stdout)
-        self.assertIn("HealthKit Export Version: 14", result.stdout)
+        self.assertIn("HealthKit Export Version: 17", result.stdout)
 
     def test_extract_schema_writes_a_file(self):
         target = support.workspace("cli") / "schema.dtd"

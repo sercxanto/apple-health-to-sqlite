@@ -44,12 +44,17 @@ def workspace(prefix: str = "case") -> Path:
 # -- building exports by hand ----------------------------------------------
 
 
-def wrap_body(body: str, *, version: int = 14, locale: str = "en_US") -> str:
-    """Wrap a `<HealthData>` body in the header a real export has."""
+def wrap_body(body: str, *, version: int | None = None, locale: str = "en_US") -> str:
+    """Wrap a `<HealthData>` body in the header a real export has.
+
+    `version` only changes what the header claims; the declarations stay those of
+    the bundled schema.
+    """
     schema = dtd.bundled_text()
-    if version != 14:
+    if version is not None:
         schema = schema.replace(
-            "HealthKit Export Version: 14", f"HealthKit Export Version: {version}"
+            f"HealthKit Export Version: {dtd.bundled().version}",
+            f"HealthKit Export Version: {version}",
         )
     return (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -69,7 +74,7 @@ def write_export(
     body: str,
     *,
     name: str = "Export.xml",
-    version: int = 14,
+    version: int | None = None,
     routes: dict[str, str] | None = None,
     directory: str = "apple_health_export",
     as_directory: bool = False,

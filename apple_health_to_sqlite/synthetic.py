@@ -8,15 +8,13 @@ with GPX routes, activity summaries — at any size you like.
 It copies the DTD from `apple_health_to_sqlite/schema/` rather than embedding its
 own, and writes every element that schema allows to occur — so the test suite exercises
 every importer handler, and this module and the importer cannot drift apart.
-The one exception is `WorkoutActivity`, which version 14 declares but
-references from no content model: emitting it would produce an invalid
-document, so a fixture covers it instead.
 """
 
 from __future__ import annotations
 
 import math
 import random
+import uuid
 import zipfile
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta, timezone
@@ -403,7 +401,9 @@ class Synthesizer:
         name, version, _ = MANUAL
         yield wrapped_tag(
             "Correlation",
-            systolic + diastolic,
+            empty_tag("MetadataEntry", indent=2, key="HKWasUserEntered", value="1")
+            + systolic
+            + diastolic,
             type="HKCorrelationTypeIdentifierBloodPressure",
             sourceName=name,
             sourceVersion=version,
@@ -520,11 +520,77 @@ class Synthesizer:
             endDate=format_timestamp(end),
         )
 
-    def workout(self, day: date, index: int):
-        """A workout with events, statistics and a GPS route.
+    def heart_rate_zones(self, minutes: float, indent: int) -> str:
+        """Minutes per heart rate zone, adding up to the time given.
 
-        Every fourth one is a multi-sport workout with `WorkoutActivity`
-        segments, so that path gets exercised too.
+        The lowest zone has no lower bound and the highest no upper one, which
+        is a guess at why the schema makes both optional. So are the values of
+        `type` and `source`: the schema only says that they are text.
+        """
+        bounds = (None, 120, 135, 150, 165, None)
+        shares = [self.random.uniform(0.5, 3.0) for _ in bounds[1:]]
+        zones = ""
+        for position, share in enumerate(shares):
+            zones += empty_tag(
+                "WorkoutZone",
+                indent=indent + 1,
+                minimum=bounds[position],
+                maximum=bounds[position + 1],
+                duration=round(minutes * share / sum(shares), 4),
+                durationUnit="min",
+            )
+        return wrapped_tag(
+            "WorkoutZoneGroup",
+            zones,
+            indent=indent,
+            type="HKQuantityTypeIdentifierHeartRate",
+            source="Apple Watch",
+            unit="count/min",
+        )
+
+    def workout_activities(self, start: datetime, minutes: int, energy: float) -> str:
+        """Two `WorkoutActivity` segments, each half of the workout."""
+        output = ""
+        half = timedelta(minutes=minutes / 2)
+        for position in range(2):
+            segment_start = start + half * position
+            segment_end = segment_start + half
+            inner = empty_tag("MetadataEntry", indent=3, key="HKIndoorWorkout", value=0)
+            inner += empty_tag(
+                "WorkoutEvent",
+                indent=3,
+                type="HKWorkoutEventTypeSegment",
+                date=format_timestamp(segment_start),
+                duration=round(minutes / 2, 4),
+                durationUnit="min",
+            )
+            inner += empty_tag(
+                "WorkoutStatistics",
+                indent=3,
+                type="HKQuantityTypeIdentifierActiveEnergyBurned",
+                startDate=format_timestamp(segment_start),
+                endDate=format_timestamp(segment_end),
+                sum=round(energy / 2, 3),
+                unit="kcal",
+            )
+            inner += self.heart_rate_zones(minutes / 2, indent=3)
+            output += wrapped_tag(
+                "WorkoutActivity",
+                inner,
+                indent=2,
+                uuid=str(uuid.UUID(int=self.random.getrandbits(128))),
+                startDate=format_timestamp(segment_start),
+                endDate=format_timestamp(segment_end),
+                duration=round(minutes / 2, 4),
+                durationUnit="min",
+            )
+        return output
+
+    def workout(self, day: date, index: int):
+        """A workout with events, statistics, zones and a GPS route.
+
+        Every fourth one also has `WorkoutActivity` segments, so that path gets
+        exercised too.
         """
         if index % 2:
             return
@@ -560,8 +626,9 @@ class Synthesizer:
             type="HKWorkoutEventTypeResume",
             date=format_timestamp(start + timedelta(minutes=minutes // 2, seconds=95)),
         )
-        inner += empty_tag(
+        inner += wrapped_tag(
             "WorkoutEvent",
+            empty_tag("MetadataEntry", indent=3, key="HKLapLength", value="1 km"),
             indent=2,
             type="HKWorkoutEventTypeLap",
             date=format_timestamp(start + timedelta(minutes=minutes // 3)),
@@ -611,7 +678,12 @@ class Synthesizer:
         name, version, device = WATCH
         inner += wrapped_tag(
             "WorkoutRoute",
-            empty_tag("FileReference", indent=3, path=f"/workout-routes/{route_name}"),
+            empty_tag(
+                "MetadataEntry", indent=3, key="HKMetadataKeySyncVersion", value=2
+            )
+            + empty_tag(
+                "FileReference", indent=3, path=f"/workout-routes/{route_name}"
+            ),
             indent=2,
             sourceName=name,
             sourceVersion=version,
@@ -621,10 +693,16 @@ class Synthesizer:
             endDate=format_timestamp(end),
         )
 
-        # The watch samples heart rate far more densely during a workout.
+        inner += self.heart_rate_zones(minutes, indent=2)
+        if index % 4 == 0:
+            inner += self.workout_activities(start, minutes, energy)
+
+        # The watch samples heart rate far more densely during a workout. The DTD
+        # notes that a workout's records also appear as top-level records in the
+        # same document, so they are emitted twice, like those of a correlation.
         for minute in range(minutes):
             moment = start + timedelta(minutes=minute)
-            yield self.record(
+            heart_rate = self.record(
                 "HKQuantityTypeIdentifierHeartRate",
                 moment,
                 moment,
@@ -632,7 +710,10 @@ class Synthesizer:
                 unit="count/min",
                 source=WATCH,
                 metadata={"HKMetadataKeyHeartRateMotionContext": "2"},
+                indent=2,
             )
+            inner += heart_rate
+            yield heart_rate
 
         # The totals are declared as attributes *and* available as statistics.
         # Real exports vary in which they populate, so do the same: every

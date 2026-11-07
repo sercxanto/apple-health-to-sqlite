@@ -6,10 +6,10 @@ file is 50 MB or 5 GB. Rows are buffered per table and written with
 `executemany`.
 
 Every element declared in the bundled DTD has a handler here. Anything else —
-an element Apple adds in a future export version — is counted, stored raw in
-the `unhandled` table, and reported at the end of the import. Silence would be
-the worse failure mode: you would not notice missing data until you went
-looking for it.
+an element Apple adds in a future export version, at any depth — is counted,
+stored raw in the `unhandled` table, and reported at the end of the import.
+Silence would be the worse failure mode: you would not notice missing data until
+you went looking for it.
 """
 
 from __future__ import annotations
@@ -46,30 +46,45 @@ TOP_LEVEL_ELEMENTS = frozenset(
     }
 )
 
-#: Elements consumed by the handler of their parent.
-CHILD_ELEMENTS = frozenset(
-    {
-        "MetadataEntry",
-        "HeartRateVariabilityMetadataList",
-        "InstantaneousBeatsPerMinute",
-        "WorkoutEvent",
-        "WorkoutStatistics",
-        "WorkoutActivity",
-        "WorkoutRoute",
-        "FileReference",
-        "SensitivityPoint",
-        "RightEye",
-        "LeftEye",
-        "Attachment",
-    }
-)
-
 #: Elements carrying export-level information rather than measurements.
 HEADER_ELEMENTS = frozenset({"HealthData", "ExportDate", "Me"})
 
+#: The children each element's handler reads. Keyed by parent because knowing a
+#: tag somewhere is not the same as reading it everywhere: `MetadataEntry` under
+#: a `WorkoutEvent` was once dropped without a word, by an importer that handled
+#: `MetadataEntry` elsewhere. A child not listed for its parent is reported as
+#: unhandled, and `tests/test_dtd.py` asserts this matches the bundled schema.
+CHILD_ELEMENTS = {
+    "HealthData": TOP_LEVEL_ELEMENTS | {"ExportDate", "Me"},
+    "Record": frozenset({"MetadataEntry", "HeartRateVariabilityMetadataList"}),
+    "HeartRateVariabilityMetadataList": frozenset({"InstantaneousBeatsPerMinute"}),
+    "Correlation": frozenset({"MetadataEntry", "Record"}),
+    "Workout": frozenset(
+        {
+            "MetadataEntry",
+            "WorkoutEvent",
+            "WorkoutRoute",
+            "WorkoutStatistics",
+            "WorkoutActivity",
+            "WorkoutZoneGroup",
+            "Record",
+        }
+    ),
+    "WorkoutActivity": frozenset(
+        {"MetadataEntry", "WorkoutEvent", "WorkoutStatistics", "WorkoutZoneGroup"}
+    ),
+    "WorkoutEvent": frozenset({"MetadataEntry"}),
+    "WorkoutRoute": frozenset({"MetadataEntry", "FileReference"}),
+    "WorkoutZoneGroup": frozenset({"WorkoutZone"}),
+    "Audiogram": frozenset({"MetadataEntry", "SensitivityPoint"}),
+    "VisionPrescription": frozenset(
+        {"RightEye", "LeftEye", "Attachment", "MetadataEntry"}
+    ),
+}
+
 #: Everything the importer knows about. `tests/test_dtd.py` asserts this covers
 #: every element declared in the bundled schema.
-HANDLED_ELEMENTS = TOP_LEVEL_ELEMENTS | CHILD_ELEMENTS | HEADER_ELEMENTS
+HANDLED_ELEMENTS = HEADER_ELEMENTS.union(*CHILD_ELEMENTS.values())
 
 #: Cap on rows kept in `unhandled`; the counter keeps counting past it.
 UNHANDLED_LIMIT = 500
@@ -292,7 +307,8 @@ class Importer:
                     (record_id, child.get("key"), child.get("value")),
                 )
             elif child.tag == "HeartRateVariabilityMetadataList":
-                for seq, beat in enumerate(child):
+                beats = child.findall("InstantaneousBeatsPerMinute")
+                for seq, beat in enumerate(beats):
                     self.add(
                         "hrv_beats",
                         (
@@ -336,6 +352,10 @@ class Importer:
         for child in element:
             if child.tag == "Record":
                 self.handle_record(child, correlation_id=correlation_id)
+            elif child.tag == "MetadataEntry":
+                self.add_extra_metadata(
+                    "correlations", correlation_id, child.get("key"), child.get("value")
+                )
 
     def _statistics_row(self, workout_id: int, activity_uuid: str, element) -> tuple:
         attributes = element.attrib
@@ -353,6 +373,62 @@ class Importer:
             as_number(attributes.get("sum")),
             attributes.get("unit"),
         )
+
+    def _add_workout_event(self, workout_id: int, seq: int, element) -> None:
+        event_type = element.get("type")
+        self.add(
+            "workout_events",
+            (
+                workout_id,
+                seq,
+                event_type,
+                short_type(event_type),
+                element.get("date"),
+                timestamps.parse(element.get("date"))[2],
+                as_number(element.get("duration")),
+                element.get("durationUnit"),
+            ),
+        )
+        for child in element:
+            if child.tag == "MetadataEntry":
+                self.add(
+                    "workout_metadata",
+                    (workout_id, f"event:{seq}:{child.get('key')}", child.get("value")),
+                )
+
+    def _add_zone_group(
+        self, workout_id: int, activity_uuid: str, seq: int, element
+    ) -> None:
+        """Time spent per zone. A group states what its zones measure once, for
+        all of them. `minimum` and `maximum` are optional in the schema, and
+        leaving them out is how a zone can be open-ended."""
+        type_name = element.get("type")
+        self.add(
+            "workout_zone_groups",
+            (
+                workout_id,
+                activity_uuid,
+                seq,
+                type_name,
+                short_type(type_name),
+                element.get("source"),
+                element.get("unit"),
+            ),
+        )
+        for zone_seq, zone in enumerate(element.findall("WorkoutZone")):
+            self.add(
+                "workout_zones",
+                (
+                    workout_id,
+                    activity_uuid,
+                    seq,
+                    zone_seq,
+                    as_number(zone.get("minimum")),
+                    as_number(zone.get("maximum")),
+                    as_number(zone.get("duration")),
+                    zone.get("durationUnit"),
+                ),
+            )
 
     def handle_workout(self, element) -> None:
         attributes = element.attrib
@@ -377,6 +453,7 @@ class Importer:
         route_file: str | None = None
         statistics: list[tuple] = []
         event_seq = 0
+        zone_group_seq = 0
 
         for child in element:
             if child.tag == "MetadataEntry":
@@ -385,20 +462,7 @@ class Importer:
                     (workout_id, child.get("key"), child.get("value")),
                 )
             elif child.tag == "WorkoutEvent":
-                event_type = child.get("type")
-                self.add(
-                    "workout_events",
-                    (
-                        workout_id,
-                        event_seq,
-                        event_type,
-                        short_type(event_type),
-                        child.get("date"),
-                        timestamps.parse(child.get("date"))[2],
-                        as_number(child.get("duration")),
-                        child.get("durationUnit"),
-                    ),
-                )
+                self._add_workout_event(workout_id, event_seq, child)
                 event_seq += 1
             elif child.tag == "WorkoutStatistics":
                 statistics.append(self._statistics_row(workout_id, "", child))
@@ -407,9 +471,25 @@ class Importer:
                     workout_id, child, statistics, event_seq
                 )
             elif child.tag == "WorkoutRoute":
-                for reference in child.iter("FileReference"):
-                    path = reference.get("path", "")
-                    route_file = path.rsplit("/", 1)[-1]
+                for part in child:
+                    if part.tag == "FileReference":
+                        route_file = part.get("path", "").rsplit("/", 1)[-1]
+                    elif part.tag == "MetadataEntry":
+                        self.add(
+                            "workout_metadata",
+                            (workout_id, f"route:{part.get('key')}", part.get("value")),
+                        )
+            elif child.tag == "WorkoutZoneGroup":
+                self._add_zone_group(workout_id, "", zone_group_seq, child)
+                zone_group_seq += 1
+            elif child.tag == "Record":
+                # Apple's DTD: "Any Records that appear as children of a Workout
+                # also appear as top-level records in this document." The two
+                # copies share a content id and collapse into one row, so the
+                # only thing this copy adds is which workout the record is from.
+                record_id = self.handle_record(child)
+                if record_id is not None:
+                    self.add("workout_records", (workout_id, record_id))
 
         for row in statistics:
             self.add("workout_statistics", row)
@@ -468,16 +548,14 @@ class Importer:
     ) -> int:
         """A segment of a multi-sport workout.
 
-        Version 14 declares `WorkoutActivity` but no content model references
-        it, so by that schema it cannot legally appear anywhere — Apple's DTD
-        is inconsistent here. The declaration exists for a reason, so this
-        stays tolerant: segments are imported wherever they turn up, including
-        the statistics and events the schema does not (yet) declare as their
-        children. Being permissive on input costs a few lines; dropping data
-        because a schema disagreed with reality costs a lot more.
+        Versions before 17 declare `WorkoutActivity` but no content model
+        references it, and they list neither statistics nor events among its
+        children. Those exports are still supported, so what a segment contains
+        is read the same whichever version the file claims to be.
         """
         attributes = element.attrib
         uuid = attributes.get("uuid") or ""
+        zone_group_seq = 0
         self.add(
             "workout_activities",
             (
@@ -498,21 +576,11 @@ class Importer:
                     (workout_id, f"{uuid}:{child.get('key')}", child.get("value")),
                 )
             elif child.tag == "WorkoutEvent":
-                event_type = child.get("type")
-                self.add(
-                    "workout_events",
-                    (
-                        workout_id,
-                        event_seq,
-                        event_type,
-                        short_type(event_type),
-                        child.get("date"),
-                        timestamps.parse(child.get("date"))[2],
-                        as_number(child.get("duration")),
-                        child.get("durationUnit"),
-                    ),
-                )
+                self._add_workout_event(workout_id, event_seq, child)
                 event_seq += 1
+            elif child.tag == "WorkoutZoneGroup":
+                self._add_zone_group(workout_id, uuid, zone_group_seq, child)
+                zone_group_seq += 1
         return event_seq
 
     def handle_activity_summary(self, element) -> None:
@@ -665,8 +733,23 @@ class Importer:
     ) -> None:
         self.add("extra_metadata", (owner_type, owner_id, key, value))
 
-    def handle_unknown(self, element) -> None:
+    def report_unread(
+        self, element, parent: str = "HealthData", path: str = ""
+    ) -> None:
+        """Report whatever the handlers do not read, at any depth.
+
+        Handlers pick out the children they know, so anything else would vanish
+        without this: the first export to nest new elements inside `<Workout>`
+        lost them while the import reported success.
+        """
         tag = element.tag
+        if tag not in CHILD_ELEMENTS.get(parent, ()):
+            self.handle_unknown(element, f"{path}{tag}")
+            return
+        for child in element:
+            self.report_unread(child, tag, f"{path}{tag}/")
+
+    def handle_unknown(self, element, tag: str) -> None:
         self.result.unhandled[tag] = self.result.unhandled.get(tag, 0) + 1
         if self._unhandled_stored < UNHANDLED_LIMIT:
             self._unhandled_stored += 1
@@ -714,12 +797,9 @@ class Importer:
                 self.result.export_date = element.get("value")
             elif tag == "Me":
                 self.result.me = dict(element.attrib)
-            else:
-                handler = handlers.get(tag)
-                if handler is not None:
-                    handler(element)
-                else:
-                    self.handle_unknown(element)
+            elif tag in handlers:
+                handlers[tag](element)
+            self.report_unread(element)
 
             seen += 1
             if on_progress is not None and seen % 250_000 == 0:

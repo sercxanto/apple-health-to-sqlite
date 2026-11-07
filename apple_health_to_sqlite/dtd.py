@@ -21,7 +21,7 @@ from typing import IO
 #: Oldest HealthKit export version this project claims to support.
 MIN_EXPORT_VERSION = 14
 
-BUNDLED_DTD = "healthkit-export-v14.dtd"
+BUNDLED_DTD = "healthkit-export-v17.dtd"
 
 #: How much of Export.xml to read while looking for the end of the DOCTYPE.
 #: The real block is ~5 kB; the cap only exists so a malformed file cannot pull
@@ -78,9 +78,9 @@ class Schema:
     def reachable_elements(self, root: str = "HealthData") -> set[str]:
         """Elements that can actually occur in a document, from `root` down.
 
-        Apple's DTD declares at least one element that no content model
-        references — `WorkoutActivity` in version 14 — so "declared" and "can
-        appear" are not the same set. The synthesizer can only produce the
+        Apple's DTD has declared elements that no content model references —
+        `WorkoutActivity` until version 17 — so "declared" and "can appear" are
+        not necessarily the same set. The synthesizer can only produce the
         reachable ones without emitting invalid XML.
         """
         seen: set[str] = set()
@@ -202,7 +202,9 @@ def diff(expected: Schema, actual: Schema) -> list[str]:
     """Compare two schemas, returning human-readable difference lines.
 
     Deliberately reports declarations only — element and attribute names — so
-    the output of `schema-diff` on a real export is safe to share.
+    the output of `schema-diff` on a real export is safe to share. A new element
+    comes with its whole declaration, because that is what it takes to fold it
+    into the bundled schema, and the name alone would not be enough.
     """
     lines: list[str] = []
 
@@ -212,7 +214,12 @@ def diff(expected: Schema, actual: Schema) -> list[str]:
         )
 
     for name in sorted(set(actual.elements) - set(expected.elements)):
-        lines.append(f"+ element {name} (in export, missing from bundled schema)")
+        element = actual.elements[name]
+        lines.append(
+            f"+ element {name} (in export, missing from bundled schema):\n"
+            f"    content:    {element.content}\n"
+            f"    attributes: {', '.join(element.attributes) or '(none)'}"
+        )
     for name in sorted(set(expected.elements) - set(actual.elements)):
         lines.append(f"- element {name} (in bundled schema, missing from export)")
 

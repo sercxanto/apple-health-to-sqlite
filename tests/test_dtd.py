@@ -15,8 +15,8 @@ class BundledSchemaTest(unittest.TestCase):
         self.schema = dtd.bundled()
 
     def test_parses_and_declares_the_expected_version(self):
-        self.assertEqual(self.schema.version, 14)
-        self.assertEqual(self.schema.require_supported(), 14)
+        self.assertEqual(self.schema.version, 17)
+        self.assertEqual(self.schema.require_supported(), 17)
 
     def test_declares_the_core_elements(self):
         for element in ("HealthData", "Record", "Workout", "WorkoutStatistics"):
@@ -50,13 +50,23 @@ class BundledSchemaTest(unittest.TestCase):
             "declared in the DTD but no importer handler",
         )
 
-    def test_workout_activity_is_declared_but_unreachable(self):
-        """Apple's version 14 DTD declares WorkoutActivity and then references
-        it from no content model. Pinned down here so that a future schema
-        update that fixes it is noticed rather than absorbed."""
+    def test_every_declared_nesting_is_read_by_a_handler(self):
+        """Having a handler somewhere is not enough. `Workout` gained `Record`
+        as a child in version 17, and the test above could not notice, because
+        `Record` has a handler at the top level."""
+        declared = {
+            name: element.children()
+            for name, element in self.schema.elements.items()
+            if element.children()
+        }
+        self.assertEqual(declared, {**importer.CHILD_ELEMENTS})
+
+    def test_every_declared_element_is_reachable(self):
+        """Up to version 14 the DTD declared WorkoutActivity and then referenced
+        it from no content model. Pinned down here so that an update bringing
+        back such an element is noticed rather than absorbed."""
         self.assertEqual(
-            set(self.schema.elements) - self.schema.reachable_elements(),
-            {"WorkoutActivity"},
+            set(self.schema.elements) - self.schema.reachable_elements(), set()
         )
 
     def test_correlation_children_are_documented_as_duplicated(self):
@@ -64,6 +74,13 @@ class BundledSchemaTest(unittest.TestCase):
         schema refresh should be visible."""
         self.assertIn(
             "also appear as top-level records",
+            self.schema.text,
+        )
+
+    def test_workout_records_are_documented_as_duplicated(self):
+        """The same for a Workout's records, and for the same reason."""
+        self.assertIn(
+            "children of a Workout also appear as top-level records",
             self.schema.text,
         )
 
@@ -110,7 +127,7 @@ class VersionGateTest(unittest.TestCase):
     def test_rejects_versions_below_fourteen(self):
         schema = dtd.parse(
             dtd.bundled_text().replace(
-                "HealthKit Export Version: 14", "HealthKit Export Version: 9"
+                "HealthKit Export Version: 17", "HealthKit Export Version: 9"
             )
         )
         with self.assertRaises(dtd.SchemaError) as caught:
@@ -122,10 +139,18 @@ class VersionGateTest(unittest.TestCase):
     def test_accepts_newer_versions(self):
         schema = dtd.parse(
             dtd.bundled_text().replace(
-                "HealthKit Export Version: 14", "HealthKit Export Version: 17"
+                "HealthKit Export Version: 17", "HealthKit Export Version: 18"
             )
         )
-        self.assertEqual(schema.require_supported(), 17)
+        self.assertEqual(schema.require_supported(), 18)
+
+    def test_accepts_the_oldest_supported_version(self):
+        schema = dtd.parse(
+            dtd.bundled_text().replace(
+                "HealthKit Export Version: 17", "HealthKit Export Version: 14"
+            )
+        )
+        self.assertEqual(schema.require_supported(), 14)
 
     def test_missing_version_comment(self):
         schema = dtd.parse("<!DOCTYPE HealthData [\n<!ELEMENT HealthData ANY>\n]>")
@@ -190,10 +215,28 @@ class DiffTest(unittest.TestCase):
         differences = dtd.diff(self.bundled, theirs)
         self.assertTrue(any("+ element BrandNew" in line for line in differences))
 
+    def test_a_new_element_comes_with_its_whole_declaration(self):
+        """The name alone is not enough to fold it into the bundled schema."""
+        theirs = dtd.parse(
+            dtd.bundled_text().replace(
+                "<!ELEMENT FileReference EMPTY>",
+                "<!ELEMENT BrandNew ((Inner)*)>\n"
+                "<!ATTLIST BrandNew\n  first CDATA #REQUIRED\n"
+                "  second CDATA #IMPLIED\n>\n"
+                "<!ELEMENT FileReference EMPTY>",
+                1,
+            )
+        )
+        line = next(
+            line for line in dtd.diff(self.bundled, theirs) if "BrandNew" in line
+        )
+        self.assertIn("((Inner)*)", line)
+        self.assertIn("first, second", line)
+
     def test_reports_a_version_change(self):
         theirs = dtd.parse(
             dtd.bundled_text().replace(
-                "HealthKit Export Version: 14", "HealthKit Export Version: 15"
+                "HealthKit Export Version: 17", "HealthKit Export Version: 15"
             )
         )
         differences = dtd.diff(self.bundled, theirs)

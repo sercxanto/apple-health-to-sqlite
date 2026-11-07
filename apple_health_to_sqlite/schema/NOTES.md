@@ -6,10 +6,10 @@ ship the schema *inside every export*: `Export.xml` opens with a
 attribute, prefixed by a version comment:
 
 ```
-<!-- HealthKit Export Version: 14 -->
+<!-- HealthKit Export Version: 17 -->
 ```
 
-That DTD is the authority this project builds on. `healthkit-export-v14.dtd` in
+That DTD is the authority this project builds on. `healthkit-export-v17.dtd` in
 this directory is a verbatim copy of it, used three ways:
 
 1. `apple_health_to_sqlite/synthetic.py` copies it into the synthetic exports the test
@@ -22,9 +22,9 @@ this directory is a verbatim copy of it, used three ways:
 
 ## Provenance
 
-Taken from a real HealthKit **export version 14** file, including Apple's own
-comments. It replaced an earlier reconstruction, and the differences were
-instructive — see [Findings](#findings) below.
+Taken from a real HealthKit **export version 17** file, including Apple's own
+comments. It replaced the one from a version 14 file, which is in the git history;
+what changed is listed under [Findings](#findings) below.
 
 To check it against another export:
 
@@ -50,20 +50,28 @@ once at the top level. The importer gives both copies the same content-derived
 id so they collapse into one row, and upserts the correlation link so it
 survives regardless of which copy the file lists first.
 
-**Workout totals exist in two places.** Version 14 declares `totalDistance`,
+**So are workout children.** Version 17 lets a `<Workout>` contain `<Record>`s,
+with the same comment. The copies collapse the same way, and `workout_records`
+keeps which workout a record came from.
+
+**What version 17 added.** Besides those records: `WorkoutZoneGroup` and
+`WorkoutZone`, as children of a workout and of a segment. A group states `type`,
+`source` and `unit`, and each zone its `duration`, with `minimum` and `maximum`
+optional. The schema says nothing about the values of `type` and `source`, and
+this project has not seen them: the importer stores them as they are, and what the
+synthesizer writes there is invented. No attribute of an existing element changed.
+
+**Workout totals exist in two places.** The schema declares `totalDistance`,
 `totalDistanceUnit`, `totalEnergyBurned` and `totalEnergyBurnedUnit` on
 `<Workout>` *and* `<WorkoutStatistics>` children that carry the same
 quantities. Exports differ in which they populate. The importer reads the
 attributes when present and falls back to the statistics otherwise; reading
 only the attributes is why some tools show empty distances.
 
-**`WorkoutActivity` is declared but unreachable.** The element and its
-attributes are declared, but no content model references it — not even
-`<Workout>`. By this schema it cannot legally appear anywhere. The declaration
-exists for a reason (multi-sport workouts), so the importer accepts segments
-wherever they turn up, including the `WorkoutStatistics` children the schema
-does not list for them. The synthesizer, which must emit valid documents, leaves
-it out; `tests/fixtures/workouts.xml` covers it instead.
+**`WorkoutActivity` was declared but unreachable until version 17.** Version 14
+declares the element, but no content model references it — not even `<Workout>`
+— and lists only `MetadataEntry` as its child. Version 17 makes it a child of
+`<Workout>`, with events, statistics and zone groups of its own.
 
 **Every vision measurement carries its own unit.** `sphere` comes with
 `sphereUnit`, `axis` with `axisUnit`, and so on. Pupillary distances are
@@ -82,8 +90,8 @@ category values (`HKCategoryValueSleepAnalysisAsleepREM` and friends, iOS 16+)
 are the visible examples.
 
 Newer versions are expected to *add* declarations. That case is handled
-gracefully: unknown elements land in the `unhandled` table and are reported at
-the end of an import rather than being dropped.
+gracefully: unknown elements, at any depth, land in the `unhandled` table and are
+reported at the end of an import rather than being dropped.
 
 ## Related files that are not covered
 

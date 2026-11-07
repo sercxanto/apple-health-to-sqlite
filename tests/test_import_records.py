@@ -150,9 +150,20 @@ class RecordImportTest(unittest.TestCase):
             self.database,
             "select healthkit_export_version, locale, export_date from export_meta",
         )[0]
-        self.assertEqual(version, 14)
+        self.assertEqual(version, 17)
         self.assertEqual(locale, "en_US")
         self.assertEqual(export_date, "2026-08-15 21:30:00 +0200")
+
+    def test_correlation_metadata_is_kept(self):
+        self.assertEqual(
+            support.rows(
+                self.database,
+                "select m.key, m.value from extra_metadata m "
+                "join correlations c on c.id = m.owner_id "
+                "where m.owner_type = 'correlations'",
+            ),
+            [("HKWasUserEntered", "1")],
+        )
 
     def test_no_unhandled_elements(self):
         self.assertEqual(self.result.unhandled, {})
@@ -171,14 +182,31 @@ class UnknownElementTest(unittest.TestCase):
         self.assertEqual(support.one(self.database, "select count(*) from records"), 1)
 
     def test_unknown_elements_are_counted_and_reported(self):
-        self.assertEqual(self.result.unhandled, {"FutureHealthThing": 2})
+        self.assertEqual(
+            self.result.unhandled,
+            {
+                "FutureHealthThing": 2,
+                "Workout/FutureWorkoutDetail": 1,
+                "Workout/WorkoutActivity/FutureSegmentDetail": 1,
+                "Workout/WorkoutStatistics/MetadataEntry": 1,
+            },
+        )
 
     def test_raw_xml_is_kept(self):
         stored = support.rows(self.database, "select tag, xml from unhandled")
-        self.assertEqual(len(stored), 2)
+        self.assertEqual(len(stored), 5)
         self.assertIn("HKSomethingNew", stored[0][1])
         # Children come along, so nothing about the element is lost.
         self.assertIn("FutureDetail", "".join(xml for _, xml in stored))
+
+
+class SupportedVersionTest(unittest.TestCase):
+    def test_the_oldest_supported_version_still_imports(self):
+        database, result = support.import_export(
+            support.export_from_fixture("records", version=14)
+        )
+        self.assertEqual(result.version, 14)
+        self.assertGreater(support.one(database, "select count(*) from records"), 0)
 
 
 class UnsupportedVersionTest(unittest.TestCase):

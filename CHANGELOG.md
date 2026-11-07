@@ -7,6 +7,15 @@ apple-health-to-sqlite follows
 
 ## [Unreleased]
 
+### Added
+
+- Exports of HealthKit version 17 are fully imported: time per workout zone is in the new tables `workout_zone_groups` and `workout_zones`, and `workout_records` says which records belong to which workout.
+- `schema-diff` shows the content and attributes of an element it does not know, not just its name.
+
+### Fixed
+
+- Elements nested inside a known element could be lost without a word: version 17 workout zones were, and so was the metadata of correlations, workout events and workout routes. All of these are now imported, and anything unrecognised is kept in `unhandled` and reported at any depth, under a path such as `Workout/SomeNewElement`. To get the missing data, import your export again; existing rows stay as they are.
+
 ## [0.1.0] - 2026-11-07
 
 ### Added

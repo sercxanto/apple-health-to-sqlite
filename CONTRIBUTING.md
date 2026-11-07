@@ -196,12 +196,13 @@ When Apple adds an element, `schema-diff` and the `unhandled` table will point
 at it. Then:
 
 1. **Update the schema.** Add the declaration to
-   `apple_health_to_sqlite/schema/healthkit-export-v14.dtd`, copying it from a real
+   `apple_health_to_sqlite/schema/healthkit-export-v17.dtd`, copying it from a real
    export's DTD (see below). This is the source of truth; nothing else moves
    until it does.
 2. **Add a handler** in `apple_health_to_sqlite/importer.py`, and list the element in
-   `TOP_LEVEL_ELEMENTS` or `CHILD_ELEMENTS`. `tests/test_dtd.py` fails until
-   every declared element is accounted for, which is the point.
+   `TOP_LEVEL_ELEMENTS` or, under its parent, in `CHILD_ELEMENTS`. `tests/test_dtd.py`
+   fails until every declared element and nesting is accounted for, which is the
+   point.
 3. **Add a table** in `apple_health_to_sqlite/db.py` if the data does not fit an existing
    one. Give it a content-addressed primary key so re-import stays idempotent;
    child tables key on `(parent_id, seq)` or `(parent_id, name)`.
@@ -210,7 +211,7 @@ at it. Then:
    can occur, so this is not optional. Synthetic exports must stay valid
    against the schema: only declared attributes, only declared nesting. An
    element that no content model references cannot be synthesized at all;
-   cover that with a fixture instead, as `WorkoutActivity` does.
+   cover that with a fixture instead.
 5. **Test it.** A focused fixture in `tests/fixtures/` for the edge cases, and
    assertions on the synthetic data for the normal path.
 6. **Document it** in the database layout table in docs/database.md.
@@ -226,11 +227,12 @@ python3 -m apple_health_to_sqlite schema-diff /path/to/Export.zip
 
 The output is declaration differences only — element and attribute names — so
 it is safe to paste into an issue. Apply those differences by hand to
-`apple_health_to_sqlite/schema/healthkit-export-v14.dtd`, or replace the file wholesale
-with `extract-schema` output if the version has moved on. Keep Apple's own
-comments: at least one of them ("Any Records that appear as children of a
-correlation also appear as top-level records") describes behaviour the importer
-depends on, and a test asserts it is still there.
+`apple_health_to_sqlite/schema/healthkit-export-v17.dtd`, or, if the version has
+moved on, replace the file wholesale with `extract-schema` output, named after the
+new version, and update `BUNDLED_DTD` in `dtd.py`. Keep Apple's own comments: two of
+them ("Any Records that appear as children of a correlation also appear as
+top-level records", and the same for a Workout) describe behaviour the importer
+depends on, and tests assert they are still there.
 
 Then follow the recipe above for anything newly declared, and record what you
 learned in `apple_health_to_sqlite/schema/NOTES.md` — its Findings section is where the

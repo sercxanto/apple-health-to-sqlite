@@ -67,12 +67,6 @@ class StructureTest(unittest.TestCase):
             missing, set(), "can occur in an export but is never synthesized"
         )
 
-    def test_does_not_emit_the_unreachable_element(self):
-        """`WorkoutActivity` is declared but referenced by no content model, so
-        emitting it would produce an invalid document. The importer still
-        handles it — see tests/fixtures/workouts.xml."""
-        self.assertEqual(set(self.schema.elements) - self.tags, {"WorkoutActivity"})
-
     def test_names_the_export_with_a_capital_e_by_default(self):
         with zipfile.ZipFile(self.export) as archive:
             names = archive.namelist()

@@ -1,5 +1,8 @@
 <!-- The three shapes a Workout comes in. -->
 
+<!-- Metadata on an event and on a route is easy to overlook: the same element
+     is read further up, so only reading it in each place keeps it. -->
+
 <!-- Statistics only: the schema allows totalDistance and totalEnergyBurned as
      attributes, but this export leaves them out and puts the numbers in
      WorkoutStatistics children. Reading only the attributes yields nothing. -->
@@ -10,7 +13,9 @@
          creationDate="2026-08-01 19:00:00 +0200"
          startDate="2026-08-01 18:00:00 +0200" endDate="2026-08-01 19:00:00 +0200">
  <MetadataEntry key="HKIndoorWorkout" value="0"/>
- <WorkoutEvent type="HKWorkoutEventTypePause" date="2026-08-01 18:30:00 +0200"/>
+ <WorkoutEvent type="HKWorkoutEventTypePause" date="2026-08-01 18:30:00 +0200">
+  <MetadataEntry key="HKFakeEventKey" value="event-value"/>
+ </WorkoutEvent>
  <WorkoutEvent type="HKWorkoutEventTypeResume" date="2026-08-01 18:31:00 +0200"/>
  <WorkoutStatistics type="HKQuantityTypeIdentifierDistanceWalkingRunning"
                     startDate="2026-08-01 18:00:00 +0200"
@@ -25,11 +30,12 @@
  <WorkoutRoute sourceName="Apple Watch" sourceVersion="10.3"
                creationDate="2026-08-01 19:00:00 +0200"
                startDate="2026-08-01 18:00:00 +0200" endDate="2026-08-01 19:00:00 +0200">
+  <MetadataEntry key="HKFakeRouteKey" value="route-value"/>
   <FileReference path="/workout-routes/route_a.gpx"/>
  </WorkoutRoute>
 </Workout>
 
-<!-- Attributes populated instead. Both forms are declared in version 14 and
+<!-- Attributes populated instead. Both forms are declared by the schema and
      both occur in the wild, so both have to work.
 
      Deliberately on the same day as the run above and earlier than it, and
@@ -42,12 +48,15 @@
          sourceName="Apple Watch" sourceVersion="9.0"
          startDate="2026-08-01 07:00:00 +0200" endDate="2026-08-01 07:30:00 +0200"/>
 
-<!-- Multi-sport. Deliberately beyond what the version 14 DTD declares: it
-     defines WorkoutActivity but no content model references it, and it does not
-     list WorkoutStatistics among its children. The declaration exists for a
-     reason, so the importer stays tolerant here rather than dropping segments
-     because Apple's schema contradicts itself. The segment statistics must also
-     not collide with the workout-level ones on (workout_id, type). -->
+<!-- Multi-sport, with everything a version 17 workout can hold. The segment
+     statistics must not collide with the workout-level ones on (workout_id,
+     type), nor the zone groups on their sequence number.
+
+     The group at the workout level has a zone with no minimum and one with no
+     maximum, the schema making both optional, and is followed by a group with
+     no zones at all, which it also allows. The Record has its top-level copy
+     *after* the Workout here and before it in the export the generator writes,
+     so both orderings are covered. -->
 <Workout workoutActivityType="HKWorkoutActivityTypeSwimBikeRun"
          duration="90" durationUnit="min"
          sourceName="Apple Watch" sourceVersion="10.3"
@@ -55,11 +64,25 @@
  <WorkoutStatistics type="HKQuantityTypeIdentifierActiveEnergyBurned"
                     startDate="2026-08-03 09:00:00 +0200"
                     endDate="2026-08-03 10:30:00 +0200" sum="900" unit="kcal"/>
+ <WorkoutZoneGroup type="HKQuantityTypeIdentifierHeartRate" source="Fake Source" unit="count/min">
+  <WorkoutZone maximum="120" duration="20" durationUnit="min"/>
+  <WorkoutZone minimum="120" maximum="150" duration="40" durationUnit="min"/>
+  <WorkoutZone minimum="150" duration="30" durationUnit="min"/>
+ </WorkoutZoneGroup>
+ <WorkoutZoneGroup type="HKQuantityTypeIdentifierCyclingPower" source="Fake Source" unit="W"/>
+ <Record type="HKQuantityTypeIdentifierHeartRate" unit="count/min" value="140"
+         sourceName="Apple Watch" sourceVersion="10.3"
+         startDate="2026-08-03 09:15:00 +0200" endDate="2026-08-03 09:15:00 +0200">
+  <MetadataEntry key="HKMetadataKeyHeartRateMotionContext" value="2"/>
+ </Record>
  <WorkoutActivity uuid="segment-swim" startDate="2026-08-03 09:00:00 +0200"
                   endDate="2026-08-03 09:30:00 +0200" duration="30" durationUnit="min">
   <WorkoutStatistics type="HKQuantityTypeIdentifierActiveEnergyBurned"
                      startDate="2026-08-03 09:00:00 +0200"
                      endDate="2026-08-03 09:30:00 +0200" sum="300" unit="kcal"/>
+  <WorkoutZoneGroup type="HKQuantityTypeIdentifierHeartRate" source="Fake Source" unit="count/min">
+   <WorkoutZone minimum="100" maximum="130" duration="30" durationUnit="min"/>
+  </WorkoutZoneGroup>
  </WorkoutActivity>
  <WorkoutActivity uuid="segment-bike" startDate="2026-08-03 09:30:00 +0200"
                   endDate="2026-08-03 10:30:00 +0200" duration="60" durationUnit="min">
@@ -68,3 +91,8 @@
                      endDate="2026-08-03 10:30:00 +0200" sum="600" unit="kcal"/>
  </WorkoutActivity>
 </Workout>
+<Record type="HKQuantityTypeIdentifierHeartRate" unit="count/min" value="140"
+        sourceName="Apple Watch" sourceVersion="10.3"
+        startDate="2026-08-03 09:15:00 +0200" endDate="2026-08-03 09:15:00 +0200">
+ <MetadataEntry key="HKMetadataKeyHeartRateMotionContext" value="2"/>
+</Record>

@@ -75,6 +75,68 @@ class WorkoutImportTest(unittest.TestCase):
             sums, [("", 900.0), ("segment-bike", 600.0), ("segment-swim", 300.0)]
         )
 
+    def test_event_and_route_metadata_are_kept(self):
+        self.assertEqual(
+            support.rows(
+                self.database,
+                "select key, value from workout_metadata "
+                "where key like 'event:%' or key like 'route:%' order by key",
+            ),
+            [
+                ("event:0:HKFakeEventKey", "event-value"),
+                ("route:HKFakeRouteKey", "route-value"),
+            ],
+        )
+
+    def test_a_workouts_record_collapses_with_its_top_level_copy(self):
+        self.assertEqual(support.one(self.database, "select count(*) from records"), 1)
+        self.assertEqual(
+            support.one(self.database, "select count(*) from record_metadata"), 1
+        )
+
+    def test_a_workouts_record_is_linked_to_it(self):
+        self.assertEqual(
+            support.rows(
+                self.database,
+                "select w.activity_short, r.value from workout_records l "
+                "join workouts w on w.id = l.workout_id "
+                "join records r on r.id = l.record_id",
+            ),
+            [("SwimBikeRun", 140.0)],
+        )
+
+    def test_zone_groups_belong_to_the_workout_or_a_segment(self):
+        self.assertEqual(
+            support.rows(
+                self.database,
+                "select activity_uuid, seq, type_short, source, unit "
+                "from workout_zone_groups order by activity_uuid, seq",
+            ),
+            [
+                ("", 0, "HeartRate", "Fake Source", "count/min"),
+                ("", 1, "CyclingPower", "Fake Source", "W"),
+                ("segment-swim", 0, "HeartRate", "Fake Source", "count/min"),
+            ],
+        )
+
+    def test_zones_may_be_open_ended(self):
+        self.assertEqual(
+            support.rows(
+                self.database,
+                "select seq, minimum, maximum, duration, duration_unit "
+                "from workout_zones where activity_uuid = '' and group_seq = 0 "
+                "order by seq",
+            ),
+            [
+                (0, None, 120.0, 20.0, "min"),
+                (1, 120.0, 150.0, 40.0, "min"),
+                (2, 150.0, None, 30.0, "min"),
+            ],
+        )
+
+    def test_nothing_in_a_version_17_workout_is_left_unhandled(self):
+        self.assertEqual(self.result.unhandled, {})
+
     def test_route_points_are_linked_to_their_workout(self):
         points = support.rows(
             self.database,
@@ -171,6 +233,51 @@ class SyntheticWorkoutTest(unittest.TestCase):
                 "on late.local_date = early.local_date "
                 "where early.route_file is null and late.route_file is not null "
                 "and early.start_ts < late.start_ts",
+            ),
+            0,
+        )
+
+    def test_a_workouts_records_are_not_counted_twice(self):
+        linked, distinct = support.rows(
+            self.database,
+            "select count(*), count(distinct record_id) from workout_records",
+        )[0]
+        self.assertGreater(linked, 0)
+        self.assertEqual(linked, distinct)
+        self.assertEqual(
+            support.one(
+                self.database,
+                "select count(*) from workout_records l "
+                "left join records r on r.id = l.record_id where r.id is null",
+            ),
+            0,
+        )
+
+    def test_zones_add_up_to_the_workout(self):
+        rows = support.rows(
+            self.database,
+            "select w.duration, sum(z.duration) from workouts w "
+            "join workout_zones z on z.workout_id = w.id "
+            "where z.activity_uuid = '' group by w.id",
+        )
+        self.assertGreater(len(rows), 0)
+        for workout_minutes, zone_minutes in rows:
+            self.assertAlmostEqual(workout_minutes, zone_minutes, places=2)
+
+    def test_segments_carry_statistics_events_and_zones(self):
+        for table in ("workout_statistics", "workout_zone_groups"):
+            self.assertGreater(
+                support.one(
+                    self.database,
+                    f"select count(*) from {table} where activity_uuid != ''",
+                ),
+                0,
+                table,
+            )
+        self.assertGreater(
+            support.one(
+                self.database,
+                "select count(*) from workout_events where type_short = 'Segment'",
             ),
             0,
         )

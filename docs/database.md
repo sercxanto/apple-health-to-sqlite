@@ -11,13 +11,18 @@ workouts                one row per workout, totals filled in from statistics
 workout_statistics      per-workout aggregates (distance, energy, heart rate)
 workout_activities      segments of a multi-sport workout
 workout_events          pause / resume / lap
-workout_metadata        MetadataEntry per workout
+workout_metadata        MetadataEntry per workout, and of its segments (<uuid>:<key>),
+                        events (event:<seq>:<key>) and route (route:<key>)
+workout_records         which records were taken during which workout
+workout_zone_groups     a workout's or segment's zones: what they measure, and the unit
+workout_zones           the zones of a group: bounds and the time spent in them
 workout_points          GPS points from the GPX routes
 activity_summaries      the three rings, per day
 clinical_records        references to clinical documents
 audiograms(+_points)    hearing tests, with masking and clamping range per ear
 vision_prescriptions    one row per eye, every measurement with its own unit
-extra_metadata          MetadataEntry and Attachment of the rarer elements above
+extra_metadata          MetadataEntry and Attachment of correlations and the rarer
+                        elements above
 export_meta             locale, export date, version, the <Me> block
 unhandled               raw XML of unrecognised elements
 daily_metrics           per metric and calendar day: n / total / mean / min / max,

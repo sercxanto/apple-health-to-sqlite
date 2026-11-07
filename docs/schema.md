@@ -21,7 +21,7 @@ Apple publishes no specification for the export format, but **ships the schema
 inside every export**: `Export.xml` opens with a `<!DOCTYPE HealthData [ … ]>`
 block declaring every element and attribute, headed by a version comment. That
 DTD is what this project is built on, and a verbatim copy of it — taken from a
-real version 14 export — lives in
+real version 17 export — lives in
 [`apple_health_to_sqlite/schema/`](../apple_health_to_sqlite/schema/). Its
 [NOTES.md](../apple_health_to_sqlite/schema/NOTES.md) collects what the schema reveals.
 
@@ -43,23 +43,23 @@ measurement — so the output is safe to paste into an issue.
 
 ## Corners that are easy to get wrong
 
-**Workout totals live in two places.** Version 14 declares `totalDistance` and
+**Workout totals live in two places.** The schema declares `totalDistance` and
 `totalEnergyBurned` as attributes of `<Workout>` *and* `<WorkoutStatistics>`
 children carrying the same quantities, and exports differ in which they fill
 in. Importers that read only the attributes show empty distances. This one
 reads the attributes when present and falls back to the statistics.
 
-**Correlation records appear twice.** The schema says so in a comment: a record
-nested in a `<Correlation>` is also emitted at the top level. Counting both
-would double every blood pressure reading. Here the two copies collapse into
-one row that keeps its correlation link.
+**Correlation and workout records appear twice.** The schema says so in comments:
+a record nested in a `<Correlation>` or a `<Workout>` is also emitted at the top
+level. Counting both would double every blood pressure reading. Here the two
+copies collapse into one row that keeps its link to the correlation or workout.
 
 Also handled: HRV records carrying a nested list of individual heartbeats;
 sleep stages as enumerated names rather than numbers; multi-sport workouts with
 `<WorkoutActivity>` segments (which the version 14 schema declares but never
-references — the importer takes them anyway); vision prescriptions where every
-measurement has its own unit.
+references — the importer takes them anyway); time per heart rate or power zone;
+vision prescriptions where every measurement has its own unit.
 
 Anything the importer does not recognise — a new element in a future export
-version — is kept verbatim in the `unhandled` table and reported at the end of
+version, however deeply nested — is kept verbatim in the `unhandled` table and reported at the end of
 the run, rather than dropped.

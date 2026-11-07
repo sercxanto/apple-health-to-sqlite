@@ -1,5 +1,5 @@
 <!DOCTYPE HealthData [
-<!-- HealthKit Export Version: 14 -->
+<!-- HealthKit Export Version: 17 -->
 <!ELEMENT HealthData (ExportDate,Me,(Record|Correlation|Workout|ActivitySummary|ClinicalRecord|Audiogram|VisionPrescription)*)>
 <!ATTLIST HealthData
   locale CDATA #REQUIRED
@@ -39,7 +39,8 @@
   startDate     CDATA #REQUIRED
   endDate       CDATA #REQUIRED
 >
-<!ELEMENT Workout ((MetadataEntry|WorkoutEvent|WorkoutRoute|WorkoutStatistics)*)>
+<!-- Note: Any Records that appear as children of a Workout also appear as top-level records in this document. -->
+<!ELEMENT Workout ((MetadataEntry|WorkoutEvent|WorkoutRoute|WorkoutStatistics|WorkoutActivity|WorkoutZoneGroup|Record)*)>
 <!ATTLIST Workout
   workoutActivityType   CDATA #REQUIRED
   duration              CDATA #IMPLIED
@@ -55,7 +56,7 @@
   startDate             CDATA #REQUIRED
   endDate               CDATA #REQUIRED
 >
-<!ELEMENT WorkoutActivity ((MetadataEntry)*)>
+<!ELEMENT WorkoutActivity ((MetadataEntry|WorkoutEvent|WorkoutStatistics|WorkoutZoneGroup)*)>
 <!ATTLIST WorkoutActivity
   uuid                 CDATA #REQUIRED
   startDate            CDATA #REQUIRED
@@ -89,6 +90,19 @@
   creationDate  CDATA #IMPLIED
   startDate     CDATA #REQUIRED
   endDate       CDATA #REQUIRED
+>
+<!ELEMENT WorkoutZoneGroup ((WorkoutZone)*)>
+<!ATTLIST WorkoutZoneGroup
+  type              CDATA #REQUIRED
+  source            CDATA #REQUIRED
+  unit              CDATA #REQUIRED
+>
+<!ELEMENT WorkoutZone EMPTY>
+<!ATTLIST WorkoutZone
+  minimum      CDATA #IMPLIED
+  maximum      CDATA #IMPLIED
+  duration     CDATA #REQUIRED
+  durationUnit CDATA #REQUIRED
 >
 <!ELEMENT FileReference EMPTY>
 <!ATTLIST FileReference
