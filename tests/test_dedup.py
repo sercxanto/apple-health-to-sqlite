@@ -10,6 +10,8 @@ import unittest
 
 from apple_health_to_sqlite.dedup import deduplicated_value
 
+from . import support
+
 
 class DeduplicatedValueTest(unittest.TestCase):
     def test_a_single_source_keeps_its_whole_value(self):
@@ -44,6 +46,34 @@ class DeduplicatedValueTest(unittest.TestCase):
         forward = deduplicated_value([(0, 10, 100, "A"), (5, 15, 100, "B")])
         reversed_ = deduplicated_value([(5, 15, 100, "B"), (0, 10, 100, "A")])
         self.assertEqual(forward, reversed_)
+
+    def test_a_sample_without_a_readable_end_counts_in_full(self):
+        """It cannot be placed on the timeline, so nothing shows it overlaps."""
+        samples = [(0, 10, 100, "A"), (0, None, 7, "B")]
+        self.assertEqual(deduplicated_value(samples), 107)
+
+
+class UnreadableTimestampTest(unittest.TestCase):
+    def test_a_bad_end_date_does_not_abort_the_import(self):
+        """One bad timestamp must not cost anyone a multi-gigabyte import, on the
+        day with several sources any more than on any other day."""
+        record = (
+            '<Record type="HKQuantityTypeIdentifierStepCount" unit="count" value="10" '
+            'sourceName="{source}" startDate="2026-03-01 08:00:00 +0100" '
+            'endDate="{end}"/>\n'
+        )
+        database, _ = support.import_export(
+            support.write_export(
+                record.format(source="Phone", end="not a date")
+                + record.format(source="Watch", end="2026-03-01 08:10:00 +0100")
+            )
+        )
+        self.assertEqual(
+            support.rows(
+                database, "select total, deduplicated_value from daily_metrics"
+            ),
+            [(20.0, 20.0)],
+        )
 
 
 if __name__ == "__main__":

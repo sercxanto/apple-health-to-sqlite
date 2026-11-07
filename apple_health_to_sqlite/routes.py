@@ -26,7 +26,7 @@ def import_routes(importer: Importer, archive: ExportArchive) -> int:
     """Import every GPX file that belongs to an already-imported workout.
 
     Returns the number of route files imported. Routes whose workout was
-    filtered out (by `--since` or `--types`) are skipped, not orphaned.
+    filtered out (by `--since`) are skipped, not orphaned.
     """
     imported = 0
     for member in archive.route_members():

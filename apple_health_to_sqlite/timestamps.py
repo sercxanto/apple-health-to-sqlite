@@ -13,10 +13,15 @@ million times.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
 #: Ordinal of the Unix epoch, used to turn a calendar date into a timestamp.
 _EPOCH_ORDINAL = date(1970, 1, 1).toordinal()
+
+
+class InvalidDate(ValueError):
+    """Raised when a date given as an option cannot be understood."""
+
 
 #: Cache of `YYYY-MM-DD` to the UTC timestamp of that date at midnight. Exports
 #: are ordered by time, so this hits on essentially every row after the first
@@ -77,6 +82,17 @@ def parse_gpx_time(value: str | None) -> int | None:
     return parse(normalised[:19] + " +0000")[2]
 
 
-def start_of_day(day: str) -> int | None:
-    """UTC timestamp of `YYYY-MM-DD` at midnight, for `--since` filtering."""
-    return parse(day + " 00:00:00 +0000")[2]
+def calendar_day(value: str) -> str:
+    """Check a date the user typed and return it as `YYYY-MM-DD`.
+
+    Unlike `parse`, this raises. A bad timestamp is one row among millions, but
+    a bad date here is a mistyped option: carrying on without it would import
+    everything while the user believes they filtered.
+    """
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date().isoformat()
+    except ValueError:
+        raise InvalidDate(
+            f"'{value}' is not a valid date. Use the form YYYY-MM-DD, "
+            f"for example 2024-01-31."
+        ) from None

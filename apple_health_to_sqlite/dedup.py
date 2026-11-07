@@ -34,7 +34,8 @@ import sqlite3
 
 # One sample as the sweep needs it: a half-open span [start, end) in epoch
 # seconds carrying a cumulative value, tagged with the source that recorded it.
-Sample = tuple[float, float, float, str]
+# The end is None when the export's end date could not be read.
+Sample = tuple[float, float | None, float, str]
 Interval = tuple[float, float]
 
 
@@ -75,9 +76,19 @@ def deduplicated_value(samples: list[Sample]) -> float:
     contributes its value scaled by the fraction of its span that lies in its
     source's winning region — the whole value when it stands alone, none of it
     when a better source covers all of it, a slice when they overlap.
+
+    A sample whose end date could not be read has no span to compare, so nothing
+    shows it overlaps anything, and it counts in full.
     """
+    placed = [
+        (start, end, value, source)
+        for start, end, value, source in samples
+        if end is not None
+    ]
+    unplaced = sum(value for _start, end, value, _source in samples if end is None)
+
     by_source: dict[str, list[Interval]] = {}
-    for start, end, _value, source in samples:
+    for start, end, _value, source in placed:
         by_source.setdefault(source, []).append((start, end))
 
     coverage = {source: _union(spans) for source, spans in by_source.items()}
@@ -92,8 +103,8 @@ def deduplicated_value(samples: list[Sample]) -> float:
         winning[source] = _subtract(region, claimed)
         claimed = _union(claimed + region)
 
-    total = 0.0
-    for start, end, value, source in samples:
+    total = float(unplaced)
+    for start, end, value, source in placed:
         span = end - start
         if span <= 0:
             # An instantaneous cumulative sample (rare): all or nothing, on

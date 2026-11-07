@@ -10,9 +10,19 @@ import argparse
 import sys
 import textwrap
 from pathlib import Path
+from typing import TextIO
 
-from . import __version__, dtd, layout, pipeline, schema_tools, synthetic
-from .archive import ExportNotFound
+from . import (
+    __version__,
+    db,
+    dtd,
+    layout,
+    pipeline,
+    schema_tools,
+    synthetic,
+    timestamps,
+)
+from .archive import DamagedExport, ExportNotFound
 from .importer import ImportOptions
 
 
@@ -80,7 +90,9 @@ def build_parser() -> argparse.ArgumentParser:
         "the database",
     )
     importer.add_argument(
-        "--since", metavar="YYYY-MM-DD", help="only data from this date on"
+        "--since",
+        metavar="YYYY-MM-DD",
+        help="only data from this calendar day on, as dated where it was recorded",
     )
     importer.add_argument(
         "--no-routes", action="store_true", help="skip the GPX workout routes"
@@ -90,7 +102,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="skip rebuilding daily_metrics and the views",
     )
-    importer.add_argument("--quiet", action="store_true", help="no progress output")
+    importer.add_argument(
+        "--quiet",
+        action="store_true",
+        help="no progress or summary; what could not be imported still goes to stderr",
+    )
 
     synthesizer = commands.add_parser(
         "synthesize", help="write a synthetic export for testing"
@@ -155,6 +171,11 @@ def command_import(args: argparse.Namespace) -> int:
 
     if options.progress:
         _report(args, database, result)
+        _report_gaps(result, sys.stdout)
+    else:
+        # Quiet is about progress, not about hiding that data was left out, and
+        # an unattended run is where nobody would otherwise find out.
+        _report_gaps(result, sys.stderr)
     return 0
 
 
@@ -170,14 +191,21 @@ def _report(args: argparse.Namespace, database: Path, result) -> None:
     print(f"\nDatabase size: {database.stat().st_size / 1e6:.1f} MB")
     print(f"View it with: {layout.view_command(args.directory)}")
 
+
+def _report_gaps(result, stream: TextIO) -> None:
+    """Say what the import could not take in, whatever else is being reported."""
     if result.unhandled:
-        print("\nElements without a handler (raw XML kept in table 'unhandled'):")
+        print(
+            "\nElements without a handler (raw XML kept in table 'unhandled'):",
+            file=stream,
+        )
         for tag, count in sorted(result.unhandled.items(), key=lambda kv: -kv[1]):
-            print(f"  {tag:22} {count:>12,}")
+            print(f"  {tag:22} {count:>12,}", file=stream)
     if result.schema_differences:
         print(
             "\nThis export's schema differs from the bundled one. Run "
-            "'schema-diff' for details; the output is safe to share."
+            "'schema-diff' for details; the output is safe to share.",
+            file=stream,
         )
 
 
@@ -251,10 +279,13 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return COMMANDS[args.command](args)
     except (
+        DamagedExport,
+        db.UnusableDatabase,
         dtd.SchemaError,
         ExportNotFound,
-        FileNotFoundError,
+        OSError,
         layout.UnusableDirectory,
+        timestamps.InvalidDate,
     ) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
