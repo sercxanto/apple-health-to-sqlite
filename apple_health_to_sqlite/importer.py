@@ -217,6 +217,13 @@ class Importer:
             "INSERT INTO records VALUES ({placeholders}) "
             "ON CONFLICT(id) DO UPDATE SET correlation_id = excluded.correlation_id"
         ),
+        # These two were not imported before layout version 1. Rows from then
+        # would otherwise stay without them, however often the export is imported.
+        "audiograms": (
+            "INSERT INTO audiograms VALUES ({placeholders}) "
+            "ON CONFLICT(id) DO UPDATE SET source_version = excluded.source_version, "
+            "creation_date = excluded.creation_date"
+        ),
     }
 
     def add(self, buffer: str, row: tuple) -> None:
@@ -700,6 +707,8 @@ class Importer:
                 attributes.get("startDate"),
                 attributes.get("endDate"),
                 timestamps.parse(attributes.get("startDate"))[2],
+                attributes.get("sourceVersion"),
+                attributes.get("creationDate"),
             ),
         )
         seq = 0

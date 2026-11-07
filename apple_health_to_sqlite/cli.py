@@ -80,14 +80,14 @@ def build_parser() -> argparse.ArgumentParser:
         nargs="+",
         metavar="TYPE",
         help="only these record types, short or fully qualified "
-        "(e.g. StepCount HeartRate)",
+        "(e.g. StepCount HeartRate); end the list with -- if the paths follow it",
     )
     importer.add_argument(
         "--exclude-types",
         nargs="+",
         metavar="TYPE",
         help="skip these record types; excluding HeartRate typically halves "
-        "the database",
+        "the database; end the list with -- if the paths follow it",
     )
     importer.add_argument(
         "--since",
@@ -304,6 +304,12 @@ def main(argv: list[str] | None = None) -> int:
     ) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
+    except KeyboardInterrupt:
+        print(
+            "\nInterrupted before it finished. Running the same command again is safe.",
+            file=sys.stderr,
+        )
+        return 130
 
 
 if __name__ == "__main__":

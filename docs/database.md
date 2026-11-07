@@ -27,7 +27,8 @@ audiograms(+_points)    hearing tests, with masking and clamping range per ear
 vision_prescriptions    one row per eye, every measurement with its own unit
 extra_metadata          MetadataEntry and Attachment of correlations and the rarer
                         elements above
-export_meta             locale, export date, version, the <Me> block
+export_meta             locale, export date, version, the <Me> block; the layout version
+                        of the database itself is in PRAGMA user_version
 unhandled               raw XML of unrecognised elements
 daily_metrics           per metric and calendar day: n / total / mean / min / max,
                         plus day_value — whichever of those the metric means —

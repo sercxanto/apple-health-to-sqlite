@@ -37,6 +37,7 @@ ranked per night. `sleep_segments` keeps every source's segments as recorded.
 from __future__ import annotations
 
 import sqlite3
+from bisect import bisect_right
 from collections.abc import Iterable
 from itertools import groupby
 
@@ -65,13 +66,20 @@ def _covered(intervals: list[Interval]) -> float:
 
 
 def _overlap(span: Interval, region: list[Interval]) -> float:
-    """How much of `span` falls inside the disjoint, sorted `region`."""
+    """How much of `span` falls inside the disjoint, sorted `region`.
+
+    Called once per sample, and a busy day has thousands of each. Starting at the
+    first piece that ends after `span` starts is what keeps the day from going
+    quadratic.
+    """
     start, end = span
     total = 0.0
-    for rs, re in region:
-        lo, hi = max(start, rs), min(end, re)
-        if hi > lo:
-            total += hi - lo
+    first = bisect_right(region, start, key=lambda piece: piece[1])
+    for index in range(first, len(region)):
+        rs, re = region[index]
+        if rs >= end:
+            break
+        total += min(end, re) - max(start, rs)
     return total
 
 
@@ -124,11 +132,15 @@ def _subtract(region: list[Interval], claimed: list[Interval]) -> list[Interval]
     region = _union(region)
     claimed = _union(claimed)
     result: list[Interval] = []
+    # Both are sorted, so a claimed span that ended before this piece began also
+    # ended before every later one, and need not be looked at again.
+    passed = 0
     for start, end in region:
         cursor = start
-        for cs, ce in claimed:
-            if ce <= cursor:
-                continue
+        while passed < len(claimed) and claimed[passed][1] <= cursor:
+            passed += 1
+        for index in range(passed, len(claimed)):
+            cs, ce = claimed[index]
             if cs >= end:
                 break
             if cs > cursor:

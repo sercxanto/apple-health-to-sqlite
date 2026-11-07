@@ -130,6 +130,7 @@ apple_health_to_sqlite/
     pipeline.py     orchestration: archive → schema check → import → derive
     archive.py      finding files inside an export (zip, directory, bare XML)
     dtd.py          parsing, version-gating and diffing Apple's schema
+    schema_tools.py what extract-schema and schema-diff do with a real export
     schema/         the committed DTD — see its NOTES.md
     catalog/        what values mean, and how days add up — see its NOTES.md
     importer.py     streaming XML → rows, one handler per element
@@ -201,11 +202,14 @@ at it. Then:
    until it does.
 2. **Add a handler** in `apple_health_to_sqlite/importer.py`, and list the element in
    `TOP_LEVEL_ELEMENTS` or, under its parent, in `CHILD_ELEMENTS`. `tests/test_dtd.py`
-   fails until every declared element and nesting is accounted for, which is the
-   point.
+   fails until every declared element, nesting and attribute is accounted for, which
+   is the point.
 3. **Add a table** in `apple_health_to_sqlite/db.py` if the data does not fit an existing
    one. Give it a content-addressed primary key so re-import stays idempotent;
-   child tables key on `(parent_id, seq)` or `(parent_id, name)`.
+   child tables key on `(parent_id, seq)` or `(parent_id, name)`. A new column on
+   an existing table goes at the end of it, with a step in `MIGRATIONS`; and since
+   `INSERT OR IGNORE` leaves existing rows as they are, it also needs an entry in
+   `Importer.STATEMENTS` if a re-import is to fill it in.
 4. **Synthesize it.** Teach `apple_health_to_sqlite/synthetic.py` to emit the element —
    `tests/test_synthetic.py` asserts the synthesizer covers every element that
    can occur, so this is not optional. Synthetic exports must stay valid
@@ -308,17 +312,6 @@ the deployment to PyPI, publishes them there, and creates a GitHub Release with 
 changelog section as its notes. Neither index holds a token for this project: they
 trust the workflow through
 [Trusted Publishing](https://docs.pypi.org/trusted-publishers/).
-
-### Before the first release
-
-These settings live outside the repository, and only the maintainer can make them:
-
-1. On PyPI and on TestPyPI, add a pending trusted publisher for the project
-   `apple-health-to-sqlite`: owner `sercxanto`, repository
-   `apple-health-to-sqlite`, workflow `release.yml`, and the environment `pypi`
-   or `testpypi` respectively.
-2. On GitHub, create the environments `pypi` and `testpypi`, both limited to tags
-   `v*`. `pypi` gets the maintainer as required reviewer.
 
 ### Cutting release X.Y.Z
 
