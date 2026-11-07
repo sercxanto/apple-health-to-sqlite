@@ -30,8 +30,8 @@ CDA_BASENAME = "export_cda.xml"
 ROUTES_DIRECTORY = "workout-routes"
 
 #: What reading a member raises when its bytes are not what they should be. The
-#: messages say where and how, never what the file contains, so they are safe to
-#: show and to paste into an issue.
+#: messages say where and how, never what the file contains. A route's file name
+#: does hold the date of the workout, though.
 _DAMAGE_ERRORS = (ElementTree.ParseError, zipfile.BadZipFile, EOFError, zlib.error)
 
 
@@ -54,6 +54,7 @@ class ExportArchive:
         self._zip: zipfile.ZipFile | None = None
         self._single_file: Path | None = None
         self._members: dict[str, str] = {}
+        self._opened: set[str] = set()
 
         if not self.path.exists():
             raise FileNotFoundError(f"No such export: {self.path}")
@@ -128,6 +129,7 @@ class ExportArchive:
         by whatever is reading it. Here is the one place that knows which file
         that was, and it covers every reader at once.
         """
+        self._opened.add(member.lower())
         try:
             with self._open_stream(member) as stream:
                 yield stream
@@ -152,6 +154,24 @@ class ExportArchive:
             for lowered, actual in self._members.items()
             if f"{ROUTES_DIRECTORY}/" in lowered and lowered.endswith(".gpx")
         )
+
+    def files_not_read(self) -> dict[str, int]:
+        """How many files nothing has opened, per entry beside the main XML file.
+
+        Counted rather than named, because the names inside these directories
+        hold dates, and the count is what says something was left behind.
+        """
+        root = self.export_member.rpartition("/")[0]
+        prefix = f"{root}/" if root else ""
+        counts: dict[str, int] = {}
+        for lowered, actual in self._members.items():
+            # A zip lists its directories as entries of their own.
+            if lowered in self._opened or lowered.endswith("/"):
+                continue
+            relative = actual.removeprefix(prefix)
+            entry = relative.split("/", 1)[0]
+            counts[entry] = counts.get(entry, 0) + 1
+        return counts
 
     def __iter__(self) -> Iterator[str]:
         return iter(sorted(self._members.values()))

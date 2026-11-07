@@ -11,6 +11,8 @@ apple-health-to-sqlite follows
 
 - Exports of HealthKit version 17 are fully imported: time per workout zone is in the new tables `workout_zone_groups` and `workout_zones`, and `workout_records` says which records belong to which workout.
 - `schema-diff` shows the content and attributes of an element it does not know, not just its name.
+- The summary of `import` counts the files in the export that were not imported, such as ECG recordings, per directory.
+- `workout_routes` keeps the source, device and time of each workout route, which were not imported before.
 
 ### Changed
 
@@ -23,7 +25,9 @@ apple-health-to-sqlite follows
 - `import --since` now also filters correlations, activity summaries, clinical records, audiograms and vision prescriptions, not just records and workouts.
 - `import --since` refuses a date it cannot read. Before, a mistyped date turned the filter off and imported everything without a word.
 - A record with an unreadable end date no longer aborts the import on a day with several sources.
-- A damaged export or workout route, a database the tool cannot use and a target it cannot write to now end in a message saying what to do, rather than a Python traceback. If a file in the export turns out to be damaged, nothing from that export reaches the database; before, a damaged route left the rest of the import in place without its derived tables.
+- A damaged export or workout route, a database the tool cannot use and a target it cannot write to now end in a message saying what to do, rather than a Python traceback. If `Export.xml` is damaged, nothing from that export reaches the database.
+- A damaged workout route no longer stops the import: it is skipped and reported by name, and so is a route the export names but does not hold. Both are reported with `--quiet` too.
+- All routes of a workout with several are imported, in the new table `workout_routes` and with all their points in `workout_points`. Before, only the last one was. To get the missing points, import your export again.
 - `import --quiet` still reports elements it could not import and a differing schema, on stderr. Before, it said nothing about them.
 - `deduplicated_value` no longer drops samples without a duration, such as a glass of water logged at one moment. A day where two sources logged only such samples read 0. To get the right numbers, import your export again.
 - `nightly_sleep` counts a night recorded by several sources once, where it used to add them up. Importing your export again updates it; `sleep_segments` still shows every source.

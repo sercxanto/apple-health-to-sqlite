@@ -45,14 +45,15 @@ def run_import(
         with _open_database(database_path) as connection:
             importer = Importer(connection, options)
 
-            # The export and its routes are one transaction, committed by
-            # `_write_export_meta`: a file that turns out to be damaged halfway
-            # through then leaves the database as it was, not half updated.
+            # One transaction, committed by `_write_export_meta`: an `Export.xml`
+            # that turns out to be damaged halfway through then leaves the database
+            # as it was, not half updated.
             with archive.open_export() as stream:
                 result = importer.parse(stream, on_progress=on_progress)
 
             if options.routes:
                 result.routes_imported = routes.import_routes(importer, archive)
+            result.files_not_read = archive.files_not_read()
             db.collapse_unhandled(connection)
 
             result.version = version
@@ -123,6 +124,7 @@ REPORTED_TABLES = (
     "workout_records",
     "workout_zone_groups",
     "workout_zones",
+    "workout_routes",
     "workout_points",
     "activity_summaries",
     "clinical_records",

@@ -114,6 +114,15 @@ CREATE TABLE IF NOT EXISTS workout_zones (
     PRIMARY KEY (workout_id, activity_uuid, group_seq, seq)
 ) WITHOUT ROWID;
 
+-- One row per route of a workout, in the export's order. file is NULL for a route
+-- that names no file. workout_points holds their points under one running seq.
+CREATE TABLE IF NOT EXISTS workout_routes (
+    workout_id INTEGER, seq INTEGER, file TEXT,
+    source_name TEXT, source_version TEXT, device TEXT, creation_date TEXT,
+    start_date TEXT, end_date TEXT,
+    PRIMARY KEY (workout_id, seq)
+) WITHOUT ROWID;
+
 CREATE TABLE IF NOT EXISTS workout_points (
     workout_id INTEGER, seq INTEGER,
     latitude REAL, longitude REAL, elevation REAL,

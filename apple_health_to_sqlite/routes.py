@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ElementTree
 
-from .archive import ExportArchive
+from .archive import DamagedExport, ExportArchive
 from .importer import Importer, as_number
 from .timestamps import parse_gpx_time
 
@@ -23,26 +23,54 @@ TRACK_POINT = GPX_NAMESPACE + "trkpt"
 
 
 def import_routes(importer: Importer, archive: ExportArchive) -> int:
-    """Import every GPX file that belongs to an already-imported workout.
+    """Import the route files of every already-imported workout.
 
-    Returns the number of route files imported. Routes whose workout was
-    filtered out (by `--since`) are skipped, not orphaned.
+    Returns the number of route files imported. Files whose workout was filtered
+    out (by `--since`) or that no workout names are left alone, and the archive
+    reports them. A file that is named but absent or damaged goes into the result:
+    one bad route is no reason to give up a whole export, and its points are
+    dropped whole, because half a track reads like a shorter run.
     """
+    members = {
+        member.rsplit("/", 1)[-1].lower(): member for member in archive.route_members()
+    }
     imported = 0
-    for member in archive.route_members():
-        filename = member.rsplit("/", 1)[-1].lower()
-        workout_id = importer.route_owners.get(filename)
-        if workout_id is None:
-            continue
-        with archive.open(member) as stream:
-            _import_one(importer, workout_id, stream)
-        imported += 1
+    for workout_id, files in importer.route_references.items():
+        # Read before anything is written, so one workout's points, and not the
+        # whole export's, are in memory at a time.
+        tracks = []
+        for name in files:
+            member = members.get(name.lower())
+            if member is None:
+                importer.result.routes_missing.append(name)
+                continue
+            try:
+                with archive.open(member) as stream:
+                    tracks.append(_read_points(stream))
+            except DamagedExport:
+                importer.result.routes_damaged.append(name)
+        imported += len(tracks)
+
+        # Version 0.1.0 kept the last of several routes, from seq 0, which is now
+        # where the first one belongs. Replaced only when every route is at hand,
+        # so that an incomplete export cannot cost points already in the database.
+        if len(files) > 1 and len(tracks) == len(files):
+            importer.connection.execute(
+                "DELETE FROM workout_points WHERE workout_id = ?", (workout_id,)
+            )
+
+        seq = 0
+        for points in tracks:
+            for point in points:
+                importer.add("workout_points", (workout_id, seq, *point))
+                seq += 1
     importer.flush()
     return imported
 
 
-def _import_one(importer: Importer, workout_id: int, stream) -> None:
-    seq = 0
+def _read_points(stream) -> list[tuple]:
+    """The columns of `workout_points` after its key, for each point of a track."""
+    points = []
     for _event, element in ElementTree.iterparse(stream, events=("end",)):
         if element.tag != TRACK_POINT:
             continue
@@ -52,11 +80,8 @@ def _import_one(importer: Importer, workout_id: int, stream) -> None:
             if child is not element and child.text
         }
         time_text = values.get("time")
-        importer.add(
-            "workout_points",
+        points.append(
             (
-                workout_id,
-                seq,
                 as_number(element.get("lat")),
                 as_number(element.get("lon")),
                 as_number(values.get("ele")),
@@ -66,7 +91,7 @@ def _import_one(importer: Importer, workout_id: int, stream) -> None:
                 as_number(values.get("course")),
                 as_number(values.get("hAcc")),
                 as_number(values.get("vAcc")),
-            ),
+            )
         )
-        seq += 1
         element.clear()
+    return points
