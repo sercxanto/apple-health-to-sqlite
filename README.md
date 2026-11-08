@@ -1,6 +1,7 @@
 # apple-health-to-sqlite
 
 [![CI](https://github.com/sercxanto/apple-health-to-sqlite/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/sercxanto/apple-health-to-sqlite/actions/workflows/ci.yml)
+[![Coverage](https://codecov.io/gh/sercxanto/apple-health-to-sqlite/graph/badge.svg)](https://codecov.io/gh/sercxanto/apple-health-to-sqlite)
 [![PyPI version](https://img.shields.io/pypi/v/apple-health-to-sqlite)](https://pypi.org/project/apple-health-to-sqlite/)
 [![Python versions](https://img.shields.io/pypi/pyversions/apple-health-to-sqlite)](https://pypi.org/project/apple-health-to-sqlite/)
 
@@ -32,7 +33,7 @@ Datasette opens with nineteen ready-made questions, one click each:
 * What is actually in my export — which metrics, from which device, since
   when, and where are the gaps?
 
-![Datasette showing a line chart of hours slept per night for ten nights, with a table of the same data below.](https://raw.githubusercontent.com/sercxanto/apple-health-to-sqlite/main/docs/datasette-sleep.png)
+<img alt="Datasette showing a line chart of hours slept per night for ten nights, with a table of the same data below." src="https://raw.githubusercontent.com/sercxanto/apple-health-to-sqlite/main/docs/datasette-sleep.png" width="360">
 
 (Sample data from `synthesize`, with the optional `datasette-vega` plugin for
 the chart.)

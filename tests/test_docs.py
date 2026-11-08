@@ -33,10 +33,11 @@ LINK = re.compile(r"!?\[[^\]]*\]\(([^)\s]*)\)")
 # The outer target of a linked image such as a badge, [![alt](image)](target),
 # of which LINK sees only the image.
 LINKED_IMAGE = re.compile(r"\[!\[[^\]]*\]\([^)\s]*\)\]\(([^)\s]*)\)")
+# The source of an <img> tag, which is how an image gets a width: Markdown has
+# no syntax for one, and a full-size screenshot can be too large on a wide page.
+IMG_SRC = re.compile(r"<img\s[^>]*?\bsrc=\"([^\"\s]*)\"", re.IGNORECASE)
 # The forms LINK does not see. A document using one would go unchecked, silently.
-OTHER_LINK_FORM = re.compile(
-    r"<a\s|<img\s|^\[[^\]]+\]:\s", re.IGNORECASE | re.MULTILINE
-)
+OTHER_LINK_FORM = re.compile(r"<a\s|^\[[^\]]+\]:\s", re.IGNORECASE | re.MULTILINE)
 EXTERNAL = re.compile(r"[a-z]+:")
 
 
@@ -51,7 +52,7 @@ def read_prose(path: Path) -> str:
 
 def links(path: Path) -> list[str]:
     prose = read_prose(path)
-    return LINK.findall(prose) + LINKED_IMAGE.findall(prose)
+    return LINK.findall(prose) + LINKED_IMAGE.findall(prose) + IMG_SRC.findall(prose)
 
 
 def anchors(path: Path) -> set[str]:
@@ -87,6 +88,13 @@ class LinkExtractionTest(unittest.TestCase):
         page = support.workspace("docs") / "page.md"
         page.write_text("[![badge](image.svg)](target.md)\n", encoding="utf-8")
         self.assertCountEqual(links(page), ["image.svg", "target.md"])
+
+    def test_an_img_tag_yields_its_source(self):
+        page = support.workspace("docs") / "page.md"
+        page.write_text(
+            '<img alt="a, b" src="image.png" width="300">\n', encoding="utf-8"
+        )
+        self.assertEqual(links(page), ["image.png"])
 
 
 class ReadmeLinkTest(unittest.TestCase):

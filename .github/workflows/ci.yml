@@ -102,6 +102,18 @@ jobs:
         run: uv sync --locked
       - name: Coverage
         run: uv run poe coverage
+      - name: Publish to Codecov
+        # For the badge in the README. Nothing is gated on it: the gate is
+        # `fail_under`, above. A missing token (a fork's pull request) or an
+        # outage at Codecov must not turn a green run red.
+        if: always()
+        run: uv run python -m coverage xml --fail-under=0
+      - uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        if: always()
+        with:
+          files: coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
       - name: Upload HTML report
         # Also when the step above failed: a tripped gate is exactly when you
         # want the line-by-line report.
